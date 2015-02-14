@@ -7,7 +7,7 @@
 % outlined in source [8] in high-level, floating point software
 
 %% LOAD SAMPLE INPUT VIDEO
-vidObj = VideoReader('Sample Input Video.mp4');
+vidObj = VideoReader('sample_input_1.mp4');
 
 %% INITIALIZE CONSTANTS
 numFrames = vidObj.NumberOfFrames;
