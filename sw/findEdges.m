@@ -9,7 +9,119 @@
 
 function [modDelta]= findEdges(delta)
 
-%For each point, observe the (4,8,16?) neighbouring pixels.
+%Result matrix
+[m,n] = size(delta);
+modDelta = delta;
 
+%Number of neighbouring points that must be non-zero to be considered an non edge point
+THRESH = 0;
+CORNER_THRESH = 2;
+BORDER_THRESH = 4;
+POINTS_THRESH = 5;
 
+%Iterate through all points
+for i = 1 : m
+	for j = 1 : n
+	
+		%Identify an object point
+		if (delta(i,j) ~= 0)
+		
+			%Point ID values
+			info_score = 0;
+			score = 0;
+			
+			%Determine type of point
+			if (i == 1 && i == m)
+				info_score = info_score + 1;
+			end
+			if (j == 1 && j == n)
+				info_score = info_score + 1;
+			end
+		
+			%Depending on the type of point, the neighbourhood will change
+			if (info_score == 1) 
+				THRESH = BORDER_THRESH;
+				
+				%TODO:
+				%Check the neighbouring 5 points
+				% if (delta(i,j) ~= 0)
+					% score = score + 1;
+				% end
+				% if (delta(i,j) ~= 0)
+					% score = score + 1;
+				% end
+				% if (delta(i,j) ~= 0)
+					% score = score + 1;
+				% end
+				% if (delta(i,j) ~= 0)
+					% score = score + 1;
+				% end
+				% if (delta(i,j) ~= 0)
+					% score = score + 1;
+				% end				
+				
+			elseif (info_score == 2) 
+				THRESH = CORNER_THRESH;
+				
+				p = -1;
+				q = -1;
+				if (i == 1)
+					p = 1;
+				end
+				if (j == 1)
+					q = 1;
+				end
+				
+				%Check the neighbouring 3 points
+				if (delta(i+p,j) ~= 0)
+					score = score + 1;
+				end
+				if (delta(i,j+q) ~= 0)
+					score = score + 1;
+				end
+				if (delta(i+p,j+q) ~= 0)
+					score = score + 1;
+				end
+				
+			else 
+				THRESH = POINTS_THRESH;
+				
+				%Check the neighbouring 8 points 
+				if (delta(i-1,j) ~= 0)
+					score = score + 1;
+				end
+				if (delta(i,j-1) ~= 0)
+					score = score + 1;
+				end
+				if (delta(i+1,j) ~= 0)
+					score = score + 1;
+				end
+				if (delta(i,j+1) ~= 0)
+					score = score + 1;
+				end
+				if (delta(i-1,j-1) ~= 0)
+					score = score + 1;
+				end				
+				if (delta(i+1,j-1) ~= 0)
+					score = score + 1;
+				end					
+				if (delta(i-1,j+1) ~= 0)
+					score = score + 1;
+				end
+				if (delta(i+1,j+1) ~= 0)
+					score = score + 1;
+				end
+				
+			end
+			
+			%Remove the object point if is surrounded by other object points
+			if (score > THRESH)
+				modDelta(i,j) = 0;
+			end
+			
+		end
+		
+	end
+end
+	
 end
