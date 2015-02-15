@@ -21,13 +21,13 @@ function [delta, NEW_THRESH]= deltaFrame(curr, base, THRESH, select)
     
     %Update filter
     deltaVec = delta(:);
-	if (select == 'constant')
+	if (strcmp(select, 'constant'))
 		NEW_THRESH = THRESH;
-	elseif (select == 'mean')
+	elseif (strcmp(select, 'mean'))
 		NEW_THRESH = mean(deltaVec(deltaVec~=0));  %MEAN FILTER WITHOUT ZERO ELEMENTS
-	elseif (select == 'median1')
+	elseif (strcmp(select, 'median1'))
 		NEW_THRESH = median(deltaVec(deltaVec~=0)); %MEDIAN FILTER WITHOUT ZERO ELEMENTS
-    elseif (select == 'median2')
+    elseif (strcmp(select, 'median2'))
 		NEW_THRESH = median(deltaVec); %MEDIAN FILTER 
 	else
 		disp('You did not select a filter type, no filter applied.')

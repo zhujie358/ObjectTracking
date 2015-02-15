@@ -14,17 +14,17 @@ function [GS_FRAME]= RGB2GRAY(RGB_FRAME, select)
 R = .2126; %Red coefficient for colorimetric RGB-Grayscale conversion 
 G = .7152; %Green coefficient for colorimetric RGB-Grayscale conversion 
 B = .0722; %Blue coefficient for colorimetric RGB-Grayscale conversion 
-[m,n] = size(RGB_FRAME);
+[m,n,~] = size(RGB_FRAME);
 GS_FRAME = zeros(m, n);
 
 %% CONVERSION
-if (select = 'efficient')
-	GS_FRAME(:,:) = R*RGB_FRAME(:,:,1) + G*RGB_FRAME(:,:,2) + B*RGB_FRAME(:,:,3);
-elseif (select = 'naive')
+if (strcmp(select, 'efficient'))
+	GS_FRAME = R*RGB_FRAME(:,:,1) + G*RGB_FRAME(:,:,2) + B*RGB_FRAME(:,:,3);
+elseif (strcmp(select, 'naive'))
 	for j = 1 : m
         for k = 1 : n
             %Convert RGB24 to Grayscale
-            GS_FRAME(m,n) = R*RGB_FRAME(m,n,1) + G*RGB_FRAME(m,n,2) + B*RGB_FRAME(m,n,3);
+            GS_FRAME(j,k) = R*RGB_FRAME(j,k,1) + G*RGB_FRAME(j,k,2) + B*RGB_FRAME(j,k,3);
         end
     end
 else

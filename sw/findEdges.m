@@ -14,7 +14,6 @@ function [modDelta]= findEdges(delta)
 modDelta = delta;
 
 %Number of neighbouring points that must be non-zero to be considered an non edge point
-THRESH = 0;
 CORNER_THRESH = 2;
 BORDER_THRESH = 4;
 POINTS_THRESH = 5;
@@ -31,10 +30,10 @@ for i = 1 : m
 			score = 0;
 			
 			%Determine type of point
-			if (i == 1 && i == m)
+			if (i == 1 || i == m)
 				info_score = info_score + 1;
 			end
-			if (j == 1 && j == n)
+			if (j == 1 || j == n)
 				info_score = info_score + 1;
 			end
 		
@@ -42,7 +41,7 @@ for i = 1 : m
 			if (info_score == 1) 
 				THRESH = BORDER_THRESH;
 				
-				%TODO:
+				%TODO: Finish logic for this case
 				%Check the neighbouring 5 points
 				% if (delta(i,j) ~= 0)
 					% score = score + 1;

@@ -8,6 +8,8 @@
 
 %% LOAD SAMPLE INPUT VIDEO
 vidObj = VideoReader('sample_input_1.mp4');
+vidObj2 = VideoWriter('./ECSE 456/ObjectTracking/sw/sample_output_1');
+open(vidObj2);
 
 %% INITIALIZE CONSTANTS
 numFrames = vidObj.NumberOfFrames;
@@ -18,6 +20,7 @@ G = .7152; %Green coefficient for colorimetric RGB-Grayscale conversion
 B = .0722; %Blue coefficient for colorimetric RGB-Grayscale conversion 
 
 %% HIGH-LEVEL ALGORITHM
+tic;
 
 GS_CURR = zeros(numRows, numCols);
 GS_BASE = zeros(numRows, numCols);
@@ -54,12 +57,12 @@ for i = 2 : numFrames
     deltaFramePrime = deltaFrame(:,:) < THRESH;
     deltaFrame = deltaFrame - deltaFrame.*deltaFramePrime;
     
-    imshow(deltaFrame/256);
-    
-    %Update filter
-    %deltaFrame = deltaFrame(:);
-    %THRESH = mean(deltaFrame(deltaFrame~=0));  %MEAN FILTER WITHOUT ZERO ELEMENTS
-    %THRESH = median(deltaFrame(deltaFrame~=0)); %MEDIAN FILTER WITHOUT ZERO ELEMENTS
-    %THRESH = median(deltaFrame); %MEDIAN FILTER 
+    %For output purposes
+    deltaFrame = deltaFrame / 256;
+    writeVideo(vidObj2, deltaFrame);
     
 end
+
+toc;
+
+close(vidObj2);
