@@ -41,30 +41,21 @@ for i = 2 : numFrames
     %Locate edges of object (remove any pixels with non-zero neighbours)
     modDelta = findEdges(delta);
     
-%     %TODO: Make this faster version using matrix math, remove for loops  
-%     %This section replaces all the edge points of the object with red
-%     modDeltaP = modDelta(:,:) ~= 0; %Array with 1's at border of object
-%     %Create new array with 3 1's at every point 
-%     
-%     modCurrFrameRGB = zeros(numRows, numCols, 3);
-%     for j = 1 : numRows
-%         for k = 1 : numCols
-%             if (modDelta ~= 0)
-%                 modCurrFrameRGB(j,k,1) = 256;
-%                 modCurrFrameRGB(j,k,2) = 0;
-%                 modCurrFrameRGB(j,k,3) = 0;
-%             else
-%                 modCurrFrameRGB(j,k,:) = currFrameRGB(j,k,:);
-%             end
-%         end
-%     end
-%     
-%     %For output purposes
-%     modCurrFrameRGB = modCurrFrameRGB / 256;
-%     writeVideo(vidObj2, modCurrFrameRGB);
-
-    modDelta = modDelta / 256;
-    writeVideo(vidObj2, modDelta);
+	%Replace the outline of the object with red pixels in the current frame
+	modDeltaP = modDelta(:,:) ~= 0; 
+	modDeltaP_3 = zeros(m,n,3);
+	modDeltaP_3(:,:,1) = modDeltaP; % modDeltaP_3(:,:,1) = modDeltaP_3(:,:,1) + modDeltaP;
+	modDeltaP_3(:,:,2) = modDeltaP; % modDeltaP_3(:,:,2) = modDeltaP_3(:,:,2) + modDeltaP;
+	modDeltaP_3(:,:,3) = modDeltaP; % modDeltaP_3(:,:,3) = modDeltaP_3(:,:,3) + modDeltaP;
+	modCurrFrameRGB = currFrameRGB - currFrameRGB.*modDeltaP_3;
+	modDeltaP_3(:,:,1) = modDeltaP_3(:,:,1) * 256;
+	modDeltaP_3(:,:,2) = 0;
+	modDeltaP_3(:,:,3) = 0;
+	modCurrFrameRGB = modCurrFrameRGB + modDeltaP_3;
+  
+	%For output purposes
+	modCurrFrameRGB = modCurrFrameRGB / 256;
+	writeVideo(vidObj2, modCurrFrameRGB);
 	
 end
 

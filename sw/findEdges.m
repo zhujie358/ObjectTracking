@@ -28,40 +28,84 @@ for i = 1 : m
 			%Point ID values
 			info_score = 0;
 			score = 0;
+			flag = 0;
 			
-			%Determine type of point
+			%Determine type of point (border, corner, regular)
 			if (i == 1 || i == m)
 				info_score = info_score + 1;
+				flag = 1;
 			end
 			if (j == 1 || j == n)
 				info_score = info_score + 1;
+				flag = 2;
 			end
 		
 			%Depending on the type of point, the neighbourhood will change
 			if (info_score == 1) 
 				THRESH = BORDER_THRESH;
 				
-				%TODO: Finish logic for this case
-				%Check the neighbouring 5 points
-				% if (delta(i,j) ~= 0)
-					% score = score + 1;
-				% end
-				% if (delta(i,j) ~= 0)
-					% score = score + 1;
-				% end
-				% if (delta(i,j) ~= 0)
-					% score = score + 1;
-				% end
-				% if (delta(i,j) ~= 0)
-					% score = score + 1;
-				% end
-				% if (delta(i,j) ~= 0)
-					% score = score + 1;
-				% end				
+				%Top/bottom border case
+				if (flag == 1)
+				
+					%Flip signs if it's the bottom
+					p = 1;
+					q = 1;
+					if (i == m)
+						p = -1;
+						q = -1;
+					end
+					
+					%Check the neighbouring 5 points 
+					if (delta(i,j+q) ~= 0)
+						score = score + 1;
+					end
+					if (delta(i+p,j+q) ~= 0)
+						score = score + 1;
+					end
+					if (delta(i+p,j) ~= 0)
+						score = score + 1;
+					end
+					if (delta(i+p,j-q) ~= 0)
+						score = score + 1;
+					end				
+					if (delta(i,j-q) ~= 0)
+						score = score + 1;
+					end	
+				
+				%Left/right border case
+				elseif(flag == 2)
+				
+					%Flip signs if it's the right
+					p = 1;
+					q = 1;
+					if (j == n)
+						p = -1;
+						q = -1;
+					end
+					
+					%Check the neighbouring 5 points 
+					if (delta(i-p,j) ~= 0)
+					score = score + 1;
+					end
+					if (delta(i-p,j+q) ~= 0)
+						score = score + 1;
+					end
+					if (delta(i,j+q) ~= 0)
+						score = score + 1;
+					end
+					if (delta(i+p,j+q) ~= 0)
+						score = score + 1;
+					end				
+					if (delta(i+p,j) ~= 0)
+						score = score + 1;
+					end	
+				
+				end			
 				
 			elseif (info_score == 2) 
 				THRESH = CORNER_THRESH;
 				
+				%Sign change for various corners
 				p = -1;
 				q = -1;
 				if (i == 1)
