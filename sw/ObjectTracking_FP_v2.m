@@ -7,15 +7,15 @@
 % outlined in source [8] in high-level, floating point software
 
 %% LOAD SAMPLE INPUT VIDEO
-vidObj = VideoReader('sample_input_1.mp4');
-vidObj2 = VideoWriter('./ECSE 456/ObjectTracking/sw/sample_output_1');
+vidObj = VideoReader('sample_input_2.mp4');
+vidObj2 = VideoWriter('./ECSE 456/ObjectTracking/sw/sample_output_2');
 open(vidObj2);
 
 %% INITIALIZE CONSTANTS
 numFrames = vidObj.NumberOfFrames;
 numRows = vidObj.Height;
 numCols = vidObj.Width;
-THRESH = 120;
+THRESH = 90;
 
 %% ALGORITHM
 tic;
@@ -30,6 +30,7 @@ for i = 2 : numFrames
     
     %Read current frame
     currFrameRGB = read(vidObj, i);
+    currFrameRGB = double(currFrameRGB);
     
 	%Convert current frame
 	GS_CURR = RGB2GRAY(currFrameRGB, 'efficient');
@@ -43,10 +44,10 @@ for i = 2 : numFrames
     
 	%Replace the outline of the object with red pixels in the current frame
 	modDeltaP = modDelta(:,:) ~= 0; 
-	modDeltaP_3 = zeros(m,n,3);
-	modDeltaP_3(:,:,1) = modDeltaP; % modDeltaP_3(:,:,1) = modDeltaP_3(:,:,1) + modDeltaP;
-	modDeltaP_3(:,:,2) = modDeltaP; % modDeltaP_3(:,:,2) = modDeltaP_3(:,:,2) + modDeltaP;
-	modDeltaP_3(:,:,3) = modDeltaP; % modDeltaP_3(:,:,3) = modDeltaP_3(:,:,3) + modDeltaP;
+	modDeltaP_3 = zeros(numRows,numCols,3);
+	modDeltaP_3(:,:,1) = modDeltaP; 
+	modDeltaP_3(:,:,2) = modDeltaP; 
+	modDeltaP_3(:,:,3) = modDeltaP; 
 	modCurrFrameRGB = currFrameRGB - currFrameRGB.*modDeltaP_3;
 	modDeltaP_3(:,:,1) = modDeltaP_3(:,:,1) * 256;
 	modDeltaP_3(:,:,2) = 0;

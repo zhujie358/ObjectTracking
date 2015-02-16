@@ -15,7 +15,7 @@ modDelta = delta;
 
 %Number of neighbouring points that must be non-zero to be considered an non edge point
 CORNER_THRESH = 2;
-BORDER_THRESH = 4;
+BORDER_THRESH = 3;
 POINTS_THRESH = 5;
 
 %Iterate through all points
