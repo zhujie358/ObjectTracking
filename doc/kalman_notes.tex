@@ -59,17 +59,128 @@ The equations present a lot of variables, which can be daunting, but most of the
 \item $\vec{x}$ (nx1): The state vector containing the state variables of the system. These are the values you want to control and use, like position, velocity, and acceleration. 
 \item $\vec{u}$ (mx1): The controlled inputs to the system that effect the states, for instance force or voltage which effect the system's velocity or acceleration.
 \end{itemize}
+\textbf{Measurement Vector:}
+\begin{itemize}
+\item $\vec{z}$ (nx1): As mentioned below, this might not be an n-vector. It could be a p-vector and then $H$ could be a pxn matrix, but for the sake of these notes assuming all states can be measured, meaning that H is unity. Since $z = H \cdot x_{true} + v$ (where $v$ is the error vector forming $R$), we are essentially saying that our measurements are the true states plus a bit of error.
+\end{itemize}
+\textbf{Error Co-variance Matrix:}
+\begin{itemize}
+\item $P$ (nxn): This matrix is also very important, and it measures how accurate the estimate is. So each iteration it updates and should converge to specific values regardless of what it is set to initially.
+\end{itemize}
 \textbf{Static Variables:}
 These are the values that aren't going to change as time goes on, and you obtain new measurements. 
 \begin{itemize}
 \item $F$ (nxn): This is the state transition matrix, sometimes denoted $A$, and describes how the system states change over a time-step (i.e. from $k$ to $k+1$). The entries of this matrix are derived using physical equations like kinematic equations, Lagrange equations, or Newton's laws. If you have a state space model of your system, or have a transfer function of the system then this matrix is found with ease. Essentially, this matrix describes how your system should act \underline{in theory}.
 \item $B$ (nxm): This is the control input model. If you derived the state transition matrix using equations mentioned above, if there are any external inputs being added to the states, this matrix would have the coefficients on those inputs.
 \item $H$ (nxn): This is the measurement model. If for some reason the space in which you measure data is different than the space which the predictions are in, you use this matrix to make them the same. For instance, if your measurement is in 3D coordinates ordered (y,x,z) and your system model is (x,y,z) this matrix would be a permutation matrix swapping rows. The dimensions might not be nxn, they might be mxm if your some reason you can't measure something (i.e. you just get position and use a derivative to get velocity). For the sake of these notes, I'm going to assume you are able to somehow measure each state.
-\item $Q$ (nxn): This matrix is a measure of the process error, meaning the error in your theoretical system model. This could be something like friction or air resistance. The matrix is a diagonal (all zeros except along diagonal) with the variance of each state error in the entry. For instance, if your process error is characterized by some vector $\vec{w} = [w_{x_1}, w_{x_2}]$ where each entry is the error for each state variable, then this matrix has the variance of each entry of $\vec{w}$ along the diagonal.
+\item $Q$ (nxn): This matrix is a measure of the process error, meaning the error in your theoretical system model. This could be something like friction or air resistance. The matrix is a diagonal (all zeros except along diagonal) with the variance of each state error in the entry. For instance, if your process error is characterized by some vector $\vec{w} = [w_{x_1}, w_{x_2}]$ ($\vec{w}$ would be added onto the first Kalman equation) where each entry is the error for each state variable, then this matrix has the variance of each entry of $\vec{w}$ along the diagonal.
 \item $R$ (nxn): This is the exact same idea of $Q$ except with your measurements. So think of $Q$ as theoretical error and $R$ as practical error.
 \end{itemize}
+\textbf{Intermediate Variables: }
+\begin{itemize}
+\item $y$ (nx1), $S$ (nxn), $K$ (nxn): These variables all have physical meanings (see Wikipedia), but I think for the purpose of a beginner they can just be thought of as steps to get to the update equations.
+\end{itemize}
 \section{The Object Tracking Scenario}
+Now that we have decomposed the Kalman equations and understand the variables, it is time to think about what these variables mean in the context of object tracking. The problem can be framed as follows: \\\\
+We are able to identify an object in a single image (frame) by means to be discussed below. But if we rely solely on these measurements we are subject to (1) the error in the measurement, (2) only knowing where the object is at the present time. For instance, if the object goes behind an obstacle obstructing its view from the camera, we cannot know where it is solely based on measurements. The Kalman equations incorporate a theoretical model of the system that could provide a means of tracking an object even when events (1) and (2) are present.
 \subsection{Measurement Model}
+By means of a Delta Frame Generation algorithm presented in [8], we were able to perform object recognition and rudimentry tracking in the MATLAB script \texttt{ObjectTracking\_FP\_v2.m}. This works by taking the first frame of the video as the base-frame, and subtracting the current frame to identify the object (all frames are converted to gray-scale). Essentially this method makes all pixels that are not the object black (0), and any that are the object non-zero (with some noise). We then perform edge detection to find the perimeter of the object.\\\\
+This algorithm is the basis of our measurement model. Since we can identify the object in the frame, we can find its position in the 2D image reference frame (x,y) where x is the column the pixel lives in and y is the row it lives in. We define the position of the object as the center most pixel inside of its edges. Using the position of the object in the current frame, and the position of the object in the previous frame, we are able to measure velocity with the following equations:
+\begin{equation}
+v_x = \frac{x_{curr} - x_{prev}}{t_{step}}
+\end{equation}
+\begin{equation}
+v_y = \frac{y_{curr} - y_{prev}}{t_{step}}
+\end{equation}
+Here $t_{step}$ is just the time between two measurements. For the case of object tracking, this is just the length of the video divided by the number of frames, since at each frame we take a measurement. In the real-time sense, this would be the frame rate of the video camera. So we have our measurement model:
+\[ \vec{z} = 
+\begin{bmatrix}
+ x, y, v_x, v_y
+\end{bmatrix}^T
+\]
+It might be redundant here to measure the velocities as well, we will see. For now, this is the exact same as the true states with some error, so we know that:
+\[ H = I \]
+Note: If we end up dropping the measurements of veocity $H$ will become the 2x4 matrix:
+\[ H =  
+\begin{bmatrix}
+ 1 & 0 & 0 & 0 \\
+ 0 & 1 & 0 & 0 
+\end{bmatrix}
+\]
 \subsection{System Model}
-
+The system model is the constant velocity model. We assume that the object exists in the 2D image reference frame and travels with constant velocity. Meaning that the position can be found using the following equations:
+\begin{equation}
+x_{k+1} = x_{k} + v_{x,k} \cdot t_{step}
+\end{equation}
+\begin{equation}
+y_{k+1} = y_{k} + v_{y,k} \cdot t_{step}
+\end{equation}
+\begin{equation}
+v_{x, k+1} = v_{x, k}
+\end{equation}
+\begin{equation}
+v_{y, k+1} = v_{y, k}
+\end{equation}
+Where $t_{step}$ is the same value as we used in the measurement model. So the state vector $\vec{x}$ is:
+\[ \vec{x} = 
+\begin{bmatrix}
+ x, y, v_x, v_y
+\end{bmatrix}^T
+\]
+The state transition matrix, control input, and the control input model is:
+\begin{equation}
+F = 
+\begin{bmatrix}
+1 & 0 & t_{step} & 0 \\
+0 & 1 & 0 & t_{step} \\
+0 & 0 & 1 & 0 \\
+0 & 0 & 0 & 1 
+\end{bmatrix}
+\end{equation}
+\begin{equation}
+\vec{u} = \vec{0}
+\end{equation}
+\begin{equation} 
+B = 
+\begin{bmatrix}
+\vec{0} & \vec{0} & ... & \vec{0}
+\end{bmatrix}
+\end{equation}
+\subsection{Error Models}
+Not very sure how to determine the error models, but if the process error is given by:
+\begin{equation}
+\vec{w} = 
+\begin{bmatrix}
+ w_x, w_y, w_{v_x}, w_{v_y}
+\end{bmatrix}^T
+\end{equation}
+And the measurement error is given by:
+\begin{equation}
+\vec{v} = 
+\begin{bmatrix}
+ v_x, v_y, v_{v_x}, v_{v_y}
+\end{bmatrix}^T
+\end{equation}
+Then $Q$ and $R$ are given as:
+\begin{equation}
+Q =
+\begin{bmatrix}
+VAR(w_x) & 0 & 0 & 0 \\
+0 & VAR(w_y) & 0 & 0 \\
+0 & 0 & VAR(w_{v_x}) & 0 \\
+0 & 0 & 0 & VAR(w_{v_y}) 
+\end{bmatrix}
+\end{equation}
+\begin{equation}
+R =
+\begin{bmatrix}
+VAR(v_x) & 0 & 0 & 0 \\
+0 & VAR(v_y) & 0 & 0 \\
+0 & 0 & VAR(v_{v_x}) & 0 \\
+0 & 0 & 0 & VAR(v_{v_y}) 
+\end{bmatrix}
+\end{equation}
+I guess for basic testing you could set the error vectors to 0 just to observe how the predictions and the measurements interact. These matrices aren't a big part of the algorithm (and by that I don't mean they aren't important) in the sense that they are only added on and are static in the Kalman equations.
+\subsection{Dynamic Equation Initialization}
+Now that we have determined the state vector, measurement vector, and static user provided variables, we must look at what the remaining variables must be set at the start. Looking at the Kalman equations, it is clear that $\vec{y}$, $S$, and $K$ all don't have a $k = 0$ iteration, meaning it is completely arbitrary what they are initialized to (from a software and algorithm stand point) as they will be filled in the first iteration. However, $P$ and $\vec{x}$ require initial values. For $\vec{x}$ the initial conditions can be set to $\vec{0}$, as it can be assumed the object starts from the origin and rest. For $P$, I have seen this initialized to a zero matrix, or a diagonal matrix with arbitrary large values, since (like $\vec{x}$) it should converge to its usual values. After testing you can initialize $P$ to values near the ones it converges to in order to save processing.
 \end{document}
