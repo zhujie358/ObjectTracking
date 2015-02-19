@@ -61,7 +61,7 @@ The equations present a lot of variables, which can be daunting, but most of the
 \end{itemize}
 \textbf{Measurement Vector:}
 \begin{itemize}
-\item $\vec{z}$ (nx1): As mentioned below, this might not be an n-vector. It could be a p-vector and then $H$ could be a pxn matrix, but for the sake of these notes assuming all states can be measured, meaning that H is unity. Since $z = H \cdot x_{true} + v$ (where $v$ is the error vector forming $R$), we are essentially saying that our measurements are the true states plus a bit of error.
+\item $\vec{z}$ (px1): This vector represents the values that you measure. These may differ from the states and are related to the state vector through the $H$ matrix and the measurement error vector $v$ discussed below.
 \end{itemize}
 \textbf{Error Co-variance Matrix:}
 \begin{itemize}
@@ -72,43 +72,19 @@ These are the values that aren't going to change as time goes on, and you obtain
 \begin{itemize}
 \item $F$ (nxn): This is the state transition matrix, sometimes denoted $A$, and describes how the system states change over a time-step (i.e. from $k$ to $k+1$). The entries of this matrix are derived using physical equations like kinematic equations, Lagrange equations, or Newton's laws. If you have a state space model of your system, or have a transfer function of the system then this matrix is found with ease. Essentially, this matrix describes how your system should act \underline{in theory}.
 \item $B$ (nxm): This is the control input model. If you derived the state transition matrix using equations mentioned above, if there are any external inputs being added to the states, this matrix would have the coefficients on those inputs.
-\item $H$ (nxn): This is the measurement model. If for some reason the space in which you measure data is different than the space which the predictions are in, you use this matrix to make them the same. For instance, if your measurement is in 3D coordinates ordered (y,x,z) and your system model is (x,y,z) this matrix would be a permutation matrix swapping rows. The dimensions might not be nxn, they might be mxm if your some reason you can't measure something (i.e. you just get position and use a derivative to get velocity). For the sake of these notes, I'm going to assume you are able to somehow measure each state.
+\item $H$ (pxn): This is the measurement model. This relates the values you measure, $\vec{z}$, to the state vector $\vec{x}$ through the equation $\vec{z} = H \cdot \vec{x} + \vec{v}$.
 \item $Q$ (nxn): This matrix is a measure of the process error, meaning the error in your theoretical system model. This could be something like friction or air resistance. The matrix is a diagonal (all zeros except along diagonal) with the variance of each state error in the entry. For instance, if your process error is characterized by some vector $\vec{w} = [w_{x_1}, w_{x_2}]$ ($\vec{w}$ would be added onto the first Kalman equation) where each entry is the error for each state variable, then this matrix has the variance of each entry of $\vec{w}$ along the diagonal.
-\item $R$ (nxn): This is the exact same idea of $Q$ except with your measurements. So think of $Q$ as theoretical error and $R$ as practical error.
+\item $R$ (pxp): This is the exact same idea of $Q$ except with your measurements. This matrix is characterized by the error vector $\vec{v}$ (px1). So think of $Q$ as theoretical error and $R$ as practical error.
 \end{itemize}
 \textbf{Intermediate Variables: }
 \begin{itemize}
-\item $y$ (nx1), $S$ (nxn), $K$ (nxn): These variables all have physical meanings (see Wikipedia), but I think for the purpose of a beginner they can just be thought of as steps to get to the update equations.
+\item $y$ (px1), $S$ (pxp), $K$ (nxp): These variables all have physical meanings (see Wikipedia), but I think for the purpose of a beginner they can just be thought of as steps to get to the update equations.
 \end{itemize}
 \section{The Object Tracking Scenario}
 Now that we have decomposed the Kalman equations and understand the variables, it is time to think about what these variables mean in the context of object tracking. The problem can be framed as follows: \\\\
 We are able to identify an object in a single image (frame) by means to be discussed below. But if we rely solely on these measurements we are subject to (1) the error in the measurement, (2) only knowing where the object is at the present time. For instance, if the object goes behind an obstacle obstructing its view from the camera, we cannot know where it is solely based on measurements. The Kalman equations incorporate a theoretical model of the system that could provide a means of tracking an object even when events (1) and (2) are present.
-\subsection{Measurement Model}
-By means of a Delta Frame Generation algorithm presented in [8], we were able to perform object recognition and rudimentry tracking in the MATLAB script \texttt{ObjectTracking\_FP\_v2.m}. This works by taking the first frame of the video as the base-frame, and subtracting the current frame to identify the object (all frames are converted to gray-scale). Essentially this method makes all pixels that are not the object black (0), and any that are the object non-zero (with some noise). We then perform edge detection to find the perimeter of the object.\\\\
-This algorithm is the basis of our measurement model. Since we can identify the object in the frame, we can find its position in the 2D image reference frame (x,y) where x is the column the pixel lives in and y is the row it lives in. We define the position of the object as the center most pixel inside of its edges. Using the position of the object in the current frame, and the position of the object in the previous frame, we are able to measure velocity with the following equations:
-\begin{equation}
-v_x = \frac{x_{curr} - x_{prev}}{t_{step}}
-\end{equation}
-\begin{equation}
-v_y = \frac{y_{curr} - y_{prev}}{t_{step}}
-\end{equation}
-Here $t_{step}$ is just the time between two measurements. For the case of object tracking, this is just the length of the video divided by the number of frames, since at each frame we take a measurement. In the real-time sense, this would be the frame rate of the video camera. So we have our measurement model:
-\[ \vec{z} = 
-\begin{bmatrix}
- x, y, v_x, v_y
-\end{bmatrix}^T
-\]
-It might be redundant here to measure the velocities as well, we will see. For now, this is the exact same as the true states with some error, so we know that:
-\[ H = I \]
-Note: If we end up dropping the measurements of veocity $H$ will become the 2x4 matrix:
-\[ H =  
-\begin{bmatrix}
- 1 & 0 & 0 & 0 \\
- 0 & 1 & 0 & 0 
-\end{bmatrix}
-\]
 \subsection{System Model}
-The system model is the constant velocity model. We assume that the object exists in the 2D image reference frame and travels with constant velocity. Meaning that the position can be found using the following equations:
+The system model is the constant velocity model. We assume that the object exists in the 2D image reference frame and travels with constant velocity. Meaning that the position can be found using the following kinematic equations:
 \begin{equation}
 x_{k+1} = x_{k} + v_{x,k} \cdot t_{step}
 \end{equation}
@@ -121,7 +97,7 @@ v_{x, k+1} = v_{x, k}
 \begin{equation}
 v_{y, k+1} = v_{y, k}
 \end{equation}
-Where $t_{step}$ is the same value as we used in the measurement model. So the state vector $\vec{x}$ is:
+Where $t_{step}$ is the time between two updates. We will see from the measurement model below that an update occurs every frame (since we get a new measurement each frame). So this time step will equal the length of the video divided by the number of frames. From a real-time perspective this value is the frame rate. So the state vector $\vec{x}$ is:
 \[ \vec{x} = 
 \begin{bmatrix}
  x, y, v_x, v_y
@@ -146,6 +122,23 @@ B =
 \vec{0} & \vec{0} & ... & \vec{0}
 \end{bmatrix}
 \end{equation}
+\subsection{Measurement Model}
+By means of a Delta Frame Generation algorithm presented in [8], we were able to perform object recognition and rudimentry tracking in the MATLAB script \texttt{ObjectTracking\_FP\_v2.m}. This works by taking the first frame of the video as the base-frame, and subtracting the current frame to identify the object (all frames are converted to gray-scale). Essentially this method makes all pixels that are not the object black (0), and any that are the object non-zero (with some noise). We then perform edge detection to find the perimeter of the object.\\\\
+This algorithm is the basis of our measurement model. Since we can identify the object in the frame, we can find its position in the 2D image reference frame (x,y) where x is the column the pixel lives in and y is the row it lives in. We define the position of the object as the center most pixel inside of its edges. So we have our measurement vector:
+\begin{equation}
+\vec{z} = 
+\begin{bmatrix}
+ x, y
+\end{bmatrix}^T
+\end{equation}
+We come up with the measurement model, $H$, by thinking about what matrix would bring the state vector, $\vec{x}$, to the measurement vector, $\vec{z}$.
+\begin{equation}
+ H =  
+\begin{bmatrix}
+ 1 & 0 & 0 & 0 \\
+ 0 & 1 & 0 & 0 
+\end{bmatrix}
+\end{equation}
 \subsection{Error Models}
 Not very sure how to determine the error models, but if the process error is given by:
 \begin{equation}
@@ -158,7 +151,7 @@ And the measurement error is given by:
 \begin{equation}
 \vec{v} = 
 \begin{bmatrix}
- v_x, v_y, v_{v_x}, v_{v_y}
+ v_x, v_y
 \end{bmatrix}^T
 \end{equation}
 Then $Q$ and $R$ are given as:
@@ -174,10 +167,8 @@ VAR(w_x) & 0 & 0 & 0 \\
 \begin{equation}
 R =
 \begin{bmatrix}
-VAR(v_x) & 0 & 0 & 0 \\
-0 & VAR(v_y) & 0 & 0 \\
-0 & 0 & VAR(v_{v_x}) & 0 \\
-0 & 0 & 0 & VAR(v_{v_y}) 
+VAR(v_x) & 0 \\
+0 & VAR(v_y) 
 \end{bmatrix}
 \end{equation}
 I guess for basic testing you could set the error vectors to 0 just to observe how the predictions and the measurements interact. These matrices aren't a big part of the algorithm (and by that I don't mean they aren't important) in the sense that they are only added on and are static in the Kalman equations.
