@@ -6,9 +6,9 @@
 % @brief Floating point software attempt number 3. This version uses the
 % Detla Frame generation from v2 with Kalman filtering for predictions.
 
-%% LOAD SAMPLE INPUT VIDEO
-vidObj = VideoReader('sample_input_2.mp4');
-vidObj2 = VideoWriter('./ECSE 456/ObjectTracking/sw/sample_output_2');
+%% INPUT-OUTPUT VIDEO OBJECTS
+vidObj = VideoReader('sample_input_1.mp4');
+vidObj2 = VideoWriter('./ECSE 456/ObjectTracking/sw/sample_output_1');
 open(vidObj2);
 
 %% INITIALIZE VIDEO CONSTANTS
@@ -57,28 +57,33 @@ for i = 2 : numFrames
     P_old = P_new;
     x_old = x_new;
     
-    %Using x_new = [x, y, v_x, v_y]' track the object
-    %TODO: Draw crosshairs, or a box around the point (x,y). Have an MxN
-    %matrix with all zeros except for the points where the box are and call
-    %the matrix "object" for the below code to work
-    
-    %Replace existing pixels with the shape used to track it (in red)
-	objectP = object(:,:) ~= 0; 
-	objectP_3 = zeros(numRows,numCols,3);
-	objectP_3(:,:,1) = objectP; 
-	objectP_3(:,:,2) = objectP; 
-	objectP_3(:,:,3) = objectP; 
-	modCurrFrameRGB = currFrameRGB - currFrameRGB.*objectP_3;
-	objectP_3(:,:,1) = objectP_3(:,:,1) * 256;
-	objectP_3(:,:,2) = 0;
-	objectP_3(:,:,3) = 0;
-	modCurrFrameRGB = modCurrFrameRGB + objectP_3;
+    %Using x_new = [x, y, v_x, v_y]' track the object. Here we create a
+    %matrix that is all zeros except for the point (x,y), and then draw a
+    %little box around it
+    x = fix(x_new(1));
+    y = fix(x_new(2));
+    if(x > 2 && y > 2)
+        A = ones(3);
+        B = padarray(A, [y-2, x-2], 'pre');
+        C = padarray(B, [numRows-(y+1), numCols-(x+1)], 'post');
+
+        %Replace existing pixels with the shape used to track it (in red)
+        objectP_3 = zeros(numRows,numCols,3);
+        objectP_3(:,:,1) = C; 
+        objectP_3(:,:,2) = C; 
+        objectP_3(:,:,3) = C; 
+        modCurrFrameRGB = currFrameRGB - currFrameRGB.*objectP_3;
+        objectP_3(:,:,1) = objectP_3(:,:,1) * 256;
+        objectP_3(:,:,2) = 0;
+        objectP_3(:,:,3) = 0;
+        modCurrFrameRGB = modCurrFrameRGB + objectP_3;
+    else
+        modCurrFrameRGB = currFrameRGB;
+    end
   
 	%For output purposes
 	modCurrFrameRGB = modCurrFrameRGB / 256;
 	writeVideo(vidObj2, modCurrFrameRGB);
-    
-	
 end
 
 toc;

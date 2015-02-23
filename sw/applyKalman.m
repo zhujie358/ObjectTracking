@@ -20,10 +20,18 @@ function [x_new, P_new] = applyKalman(z, x_old, P_old, t_step)
 %% INITIALIZE USER DETERMINED, STATIC VARIABLES
 F = [1 0 t_step 0; 0 1 0 t_step; 0 0 1 0; 0 0 0 1];
 H = [1 0 0 0; 0 1 0 0];
-w = [1 1 1 1]'; %TODO: What is the error in the theoretical model?
-v = [1 1]'; %TODO: What is the error in the measurement process?
-Q = diag([var(w) var(w) var(w) var(1)]);
-R = diag([var(v) var(v)]);
+
+%TODO: Define the error in the theoretical model (w) and the error in the
+%measurement process (v). Below they assume no error which doesn't work
+%w = [1 1 1 1]'; 
+%v = [1 1]'; 
+%Q = diag([var(w) var(w) var(w) var(w)]);
+%R = diag([var(v) var(v)]);
+
+%Here we copy the error matrices from the kalmanfilter.m example code since
+%we are currently unable to characterize the error vectors above
+Q = eye(4);
+R = 1000 * eye(2);
 
 %% PREDICTION EQUATIONS
 x_new_pred = F * x_old;
@@ -32,7 +40,7 @@ P_new_pred = F*P_old*F' + Q;
 %% INTERMEDIATE CALCULATIONS
 y = z - H*x_new_pred;
 S = H*P_new_pred*H' + R;
-K = P*H'\S;
+K = P_new_pred*H'/S;
 
 %% UPDATE EQUATIONS
 x_new = x_new_pred + K*y;
