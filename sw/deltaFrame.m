@@ -6,31 +6,25 @@
 % @brief Function to compute and filter the delta fame
 % @param curr: MxN current frame
 % @param base: MxN base frame
-% @param THRESH: Floating point threshold for filtering
 % @param select: String for filter type to use (constant, mean, median1, median2)
 % @retval delta: MxN delta frame
 
-function [delta, NEW_THRESH]= deltaFrame(curr, base, THRESH, select)
+function [delta] = deltaFrame(curr, base, select)
 
 	%Compute delta frame
     delta = abs(curr - base);
     
-    %Filter delta frame
+    %Update filter
+	if (strcmp(select, 'constant'))
+		THRESH = 90;
+	elseif (strcmp(select, 'mean'))
+		THRESH = myMean(delta);
+	else
+		disp('You did not select a filter type, no filter applied.');
+		THRESH = 0;
+    end
+    
+    %Filter by removing all elements that meet the condition below
     deltaP = delta(:,:) < THRESH;
     delta = delta - delta.*deltaP;
-    
-    %Update filter
-    deltaVec = delta(:);
-	if (strcmp(select, 'constant'))
-		NEW_THRESH = THRESH;
-	elseif (strcmp(select, 'mean'))
-		NEW_THRESH = mean(deltaVec(deltaVec~=0));  %MEAN FILTER WITHOUT ZERO ELEMENTS
-	elseif (strcmp(select, 'median1'))
-		NEW_THRESH = median(deltaVec(deltaVec~=0)); %MEDIAN FILTER WITHOUT ZERO ELEMENTS
-    elseif (strcmp(select, 'median2'))
-		NEW_THRESH = median(deltaVec); %MEDIAN FILTER 
-	else
-		disp('You did not select a filter type, no filter applied.')
-		NEW_THRESH = 0;
-	end
 end

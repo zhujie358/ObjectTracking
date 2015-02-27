@@ -15,7 +15,6 @@ open(vidObj2);
 numFrames = vidObj.NumberOfFrames;
 numRows = vidObj.Height;
 numCols = vidObj.Width;
-THRESH = 90;
 
 %% INITIALIZE KALMAN VARIABLES
 x_old = zeros(4,1);
@@ -42,13 +41,10 @@ for i = 2 : numFrames
 	GS_CURR = double(GS_CURR);
     
 	%Compute and filter delta frame
-	[delta, THRESH] = deltaFrame(GS_CURR, GS_BASE, THRESH, 'constant');
+	delta = deltaFrame(GS_CURR, GS_BASE, 'constant');
     
-    %Locate edges of object (remove any pixels with non-zero neighbours)
-    modDelta = findEdges(delta);
-    
-    %Based on the edges of the object, detemine its (x,y) position
-    z = measure(modDelta);
+    %Based on the delta frame, detemine its (x,y) position
+    z = measure(delta);
   
     %Perform a Kalman filter iteration based on this measurement
     [x_new, P_new] = applyKalman(z, x_old, P_old, t_step);
@@ -57,33 +53,50 @@ for i = 2 : numFrames
     P_old = P_new;
     x_old = x_new;
     
-    %Using x_new = [x, y, v_x, v_y]' track the object. Here we create a
-    %matrix that is all zeros except for the point (x,y), and then draw a
-    %little box around it
+    %Draw a red box dot at the post-Kalman filtered position
     x = fix(x_new(1));
     y = fix(x_new(2));
-    if(x > 2 && y > 2)
-        A = ones(3);
-        B = padarray(A, [y-2, x-2], 'pre');
-        C = padarray(B, [numRows-(y+1), numCols-(x+1)], 'post');
-
-        %Replace existing pixels with the shape used to track it (in red)
-        objectP_3 = zeros(numRows,numCols,3);
-        objectP_3(:,:,1) = C; 
-        objectP_3(:,:,2) = C; 
-        objectP_3(:,:,3) = C; 
-        modCurrFrameRGB = currFrameRGB - currFrameRGB.*objectP_3;
-        objectP_3(:,:,1) = objectP_3(:,:,1) * 256;
-        objectP_3(:,:,2) = 0;
-        objectP_3(:,:,3) = 0;
-        modCurrFrameRGB = modCurrFrameRGB + objectP_3;
-    else
-        modCurrFrameRGB = currFrameRGB;
+    if (x <= 0)
+        x = 1;
     end
-  
+    if (y <= 0)
+        y = 1;
+    end
+    currFrameRGB(y, x, :) = [256,0,0];
+    
+    %Draw a red box around that position (space permitting)
+    bottomClear = false;
+    topClear = false;
+    if (y+1 <= numRows)
+        currFrameRGB(y+1, x, :) = [256,0,0];
+        bottomClear = true;
+    end
+    if(y-1 > 0)
+        currFrameRGB(y-1, x, :) = [256,0,0];
+        topClear = true;
+    end
+    if (x+1 <= numCols)
+        currFrameRGB(y, x+1, :) = [256,0,0];
+        if (topClear)
+            currFrameRGB(y-1, x+1, :) = [256,0,0];
+        end
+        if (bottomClear)
+            currFrameRGB(y+1, x+1, :) = [256,0,0];
+        end
+    end
+    if (x-1 > 0)
+        currFrameRGB(y, x-1, :) = [256,0,0];
+        if (topClear)
+            currFrameRGB(y-1, x-1, :) = [256,0,0];
+        end
+        if (bottomClear)
+            currFrameRGB(y+1, x-1, :) = [256,0,0];
+        end
+    end
+    
 	%For output purposes
-	modCurrFrameRGB = modCurrFrameRGB / 256;
-	writeVideo(vidObj2, modCurrFrameRGB);
+	currFrameRGB = currFrameRGB / 256;
+	writeVideo(vidObj2, currFrameRGB);
 end
 
 toc;
