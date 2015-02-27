@@ -18,7 +18,10 @@ function [delta] = deltaFrame(curr, base, select)
 	if (strcmp(select, 'constant'))
 		THRESH = 90;
 	elseif (strcmp(select, 'mean'))
+        %TODO: The mean filter gives bad results
 		THRESH = myMean(delta);
+    elseif (strcmp(select, 'median'));
+        %TODO: Write a median function without MATLAB functions
 	else
 		disp('You did not select a filter type, no filter applied.');
 		THRESH = 0;

@@ -58,9 +58,13 @@ for i = 2 : numFrames
     y = fix(x_new(2));
     if (x <= 0)
         x = 1;
+    elseif (x > numCols)
+        x = numCols;
     end
     if (y <= 0)
         y = 1;
+    elseif (y > numRows)
+        y = numRows;
     end
     currFrameRGB(y, x, :) = [256,0,0];
     
