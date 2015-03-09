@@ -31,7 +31,7 @@ for i = 1 : m
     end
 end
 
-Sort the non-zero elements by increasing order
+%Sort the non-zero elements by increasing order
 isOrdered = false;
 howMany = 0;
 
