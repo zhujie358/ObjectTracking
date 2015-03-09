@@ -51,6 +51,7 @@ while (~isOrdered)
     end
 end
 
+%Locate the median
 if (mod(countNonZero,2) == 0)
 	middle_1 = countNonZero/2;
 	middle_2 = middle_1 + 1;

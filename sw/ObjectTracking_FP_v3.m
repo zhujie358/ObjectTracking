@@ -17,7 +17,7 @@ numRows = vidObj.Height;
 numCols = vidObj.Width;
 
 %% INITIALIZE KALMAN VARIABLES
-x_old = zeros(4,1);
+x_old = [numCols/2, 0, 0, 0]';
 P_old = eye(4);
 t_step = vidObj.Duration / numFrames;
 
