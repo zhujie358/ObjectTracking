@@ -13,7 +13,7 @@ function [median]= myMedian(frame)
 isOrdered = false;
 howMany = 0;
 
-while (!isOrdered)
+while (~isOrdered)
 	for i = 1 : m
 		for j = 1 : n
 			if (j ~= n)
@@ -42,15 +42,15 @@ while (!isOrdered)
 	end
 end
 
-if (mod((m+n),2) == 0)
-	middle_1 = (m+n)/2;
+if (mod((m*n),2) == 0)
+	middle_1 = (m*n)/2;
 	middle_2 = middle_1 + 1;
 	[m_1, n_1] = lin2mat(middle_1, m, n);
 	[m_2, n_2] = lin2mat(middle_2, m, n);
 	median = (frame(m_1, n_1) + frame(m_2, n_2))/2;
 
 else
-	middle = ceil((m+n)/2);
+	middle = ceil((m*n)/2);
 	[m_3, n_3] = lin2mat(middle, m, n);
 	median = frame(m_3, n_3);
 end
