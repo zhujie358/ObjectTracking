@@ -9,50 +9,56 @@
 
 function [median]= myMedian(frame)
 
+%Put all non-zero elements into a vector
 [m,n] = size(frame);
+
+countNonZero = 0;
+for i = 1 : m
+    for j = 1 : n
+        if (frame(i,j)~=0)
+            countNonZero = countNonZero + 1;
+        end
+    end
+end
+modFrame = zeros(1,countNonZero);
+k = 1; 
+for i = 1 : m
+    for j = 1 : n
+        if (frame(i,j)~=0)
+            modFrame(1,k) = frame(i,j);
+            k = k + 1;
+        end
+    end
+end
+
+Sort the non-zero elements by increasing order
 isOrdered = false;
 howMany = 0;
 
 while (~isOrdered)
-	for i = 1 : m
-		for j = 1 : n
-			if (j ~= n)
-				if (frame(i,j) < frame(i,j+1))
-					temp = frame(i,j);
-					frame(i,j) = frame(i,j+1);
-					frame(i,j+1) = temp;
-					howMany = howMany + 1;
-				end
-			elseif (j == n && i~= m)
-				if (frame(i,j) < frame(i+1, 1))
-					temp = frame(i,j);
-					frame(i,j) = frame(i+1,1);
-					frame(i+1,1) = temp;
-					howMany = howMany + 1;
-				end
-			else
-				%This last case is if j == n && i == m in which case do nothing because it's the last pixel
-			end	
-		end
-	end
-	if (howMany == 0)
-		isOrdered = true;
-	else
-		howMany = 0;
-	end
+    for i = 1 : countNonZero-1
+        if (modFrame(1,i) < modFrame(1,i+1))
+            temp = modFrame(1,i);
+            modFrame(1,i) = modFrame(1,i+1);
+            modFrame(1,i+1) = temp;
+            howMany = howMany + 1;
+        end
+    end
+    if (howMany == 0)
+        isOrdered = true;
+    else
+        howMany = 0;
+    end
 end
 
-if (mod((m*n),2) == 0)
-	middle_1 = (m*n)/2;
+if (mod(countNonZero,2) == 0)
+	middle_1 = countNonZero/2;
 	middle_2 = middle_1 + 1;
-	[m_1, n_1] = lin2mat(middle_1, m, n);
-	[m_2, n_2] = lin2mat(middle_2, m, n);
-	median = (frame(m_1, n_1) + frame(m_2, n_2))/2;
+	median = (modFrame(1, middle_1) + modFrame(1, middle_2))/2;
 
 else
-	middle = ceil((m*n)/2);
-	[m_3, n_3] = lin2mat(middle, m, n);
-	median = frame(m_3, n_3);
+	middle = ceil(countNonZero/2);
+	median = modFrame(1, middle);
 end
 
 end
