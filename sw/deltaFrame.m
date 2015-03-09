@@ -12,23 +12,21 @@
 function [delta] = deltaFrame(curr, base, select)
 
 	%Compute delta frame
-    delta = abs(curr - base);
+    	delta = abs(curr - base);
     
-    %Update filter
+	 %Update filter
 	if (strcmp(select, 'constant'))
 		THRESH = 90;
 	elseif (strcmp(select, 'mean'))
-        %TODO: The mean filter gives bad results
 		THRESH = myMean(delta);
-    elseif (strcmp(select, 'median'));
-		%TODO: Test the median filter
-        THRESH = myMedian(delta);
+	elseif (strcmp(select, 'median'));
+        	THRESH = myMedian(delta);
 	else
 		disp('You did not select a filter type, no filter applied.');
 		THRESH = 0;
-    end
+	end
     
-    %Filter by removing all elements that meet the condition below
-    deltaP = delta(:,:) < THRESH;
-    delta = delta - delta.*deltaP;
+    	%Filter by removing all elements that meet the condition below
+    	deltaP = delta(:,:) < THRESH;
+    	delta = delta - delta.*deltaP;
 end
