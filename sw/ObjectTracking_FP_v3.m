@@ -21,30 +21,36 @@ x_old = [numCols/2, 0, 0, 0]';
 P_old = eye(4);
 t_step = vidObj.Duration / numFrames;
 
+%% INITIALIZE FILTER VARIABLE
+THRESH = 90;
+
 %% ALGORITHM
 tic;
 
 %Compute the base frame grayscale, all other frames will use this to look for motion
 baseFrameRGB = read(vidObj, 1);
-GS_BASE = RGB2GRAY(baseFrameRGB, 'efficient');
-GS_BASE = double(GS_BASE);
+GS_BASE = RGB2GRAY(baseFrameRGB);
 
 %Iterate through the remaining frames looking for motion
 for i = 2 : numFrames
+    
+    disp(i);
     
     %Read current frame
     currFrameRGB = read(vidObj, i);
     currFrameRGB = double(currFrameRGB);
     
 	%Convert current frame
-	GS_CURR = RGB2GRAY(currFrameRGB, 'efficient');
-	GS_CURR = double(GS_CURR);
+	GS_CURR = RGB2GRAY(currFrameRGB);
     
 	%Compute and filter delta frame
-	delta = deltaFrame(GS_CURR, GS_BASE, 'constant');
+	[delta, THRESH] = deltaFrame(GS_CURR, GS_BASE, THRESH);
+    
+    %Use edge detection to apply a median filter and reduce noise
+    filteredDelta = medianFilter(delta, THRESH);
     
     %Based on the delta frame, detemine its (x,y) position
-    z = measure(delta);
+    z = measure(filteredDelta);
   
     %Perform a Kalman filter iteration based on this measurement
     [x_new, P_new] = applyKalman(z, x_old, P_old, t_step);
