@@ -4,7 +4,7 @@
 % @author Taylor Dotsikas (taylor.dotsikas@mail.mcgill.ca)
 % @date February 20th, 2015
 % @brief Floating point software attempt number 3. This version uses the
-% Detla Frame generation from v2 with Kalman filtering for predictions.
+% Delta Frame generation from v2 with Kalman filtering for predictions.
 
 %% INPUT-OUTPUT VIDEO OBJECTS
 vidObj = VideoReader('sample_input_1.mp4');
