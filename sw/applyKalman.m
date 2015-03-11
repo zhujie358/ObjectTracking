@@ -40,7 +40,9 @@ P_new_pred = F*P_old*F' + Q;
 %% INTERMEDIATE CALCULATIONS
 y = z - H*x_new_pred;
 S = H*P_new_pred*H' + R;
-K = P_new_pred*H'/S;
+invdetS = 1 / (S(1)*S(4) - S(2)*S(3));
+S_inv = invdetS * [S(4) -S(2); -S(3) S(1)];
+K = P_new_pred*H'*S_inv;
 
 %% UPDATE EQUATIONS
 x_new = x_new_pred + K*y;

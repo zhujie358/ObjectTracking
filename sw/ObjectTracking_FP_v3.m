@@ -34,8 +34,6 @@ GS_BASE = RGB2GRAY(baseFrameRGB);
 %Iterate through the remaining frames looking for motion
 for i = 2 : numFrames
     
-    disp(i);
-    
     %Read current frame
     currFrameRGB = read(vidObj, i);
     currFrameRGB = double(currFrameRGB);
@@ -47,7 +45,7 @@ for i = 2 : numFrames
 	[delta, THRESH] = deltaFrame(GS_CURR, GS_BASE, THRESH);
     
     %Use edge detection to apply a median filter and reduce noise
-    filteredDelta = medianFilter(delta, THRESH);
+    filteredDelta = medfilt2(delta);
     
     %Based on the delta frame, detemine its (x,y) position
     z = measure(filteredDelta);
