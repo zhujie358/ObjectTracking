@@ -9,6 +9,8 @@
 
 function [GS_FRAME]= RGB2GRAY(RGB_FRAME)
 
+RGB_FRAME = double(RGB_FRAME);
+
 %% INITIALIZE
 R = .2126; %Red coefficient for colorimetric RGB-Grayscale conversion 
 G = .7152; %Green coefficient for colorimetric RGB-Grayscale conversion 

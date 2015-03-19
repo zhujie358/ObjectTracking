@@ -11,13 +11,13 @@
 
 function [delta, NEW_THRESH] = deltaFrame(curr, base, INIT_THRESH)
 
-	%Compute delta frame
+	%Compute delta frame, F = frac
     delta = abs(curr - base);
     
     %Filter by removing all elements that meet the condition below
-    deltaP = delta(:,:) < INIT_THRESH;
-    deltaX = delta(:,:) >= INIT_THRESH;
-    delta = delta - delta.*deltaP;
+    deltaP = delta(:,:) < INIT_THRESH; 
+    deltaX = delta(:,:) >= INIT_THRESH; 
+    delta = delta - delta.*deltaP; 
     back = delta - delta.*deltaX;
     delta_avg = myMean(delta);
     back_avg = myMean(back);

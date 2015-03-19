@@ -19,36 +19,43 @@ open(vidObj2);
 
 %% INITIALIZE VIDEO CONSTANTS
 numFrames = vidObj.NumberOfFrames;
+numFramesInv = 1 / numFrames;
 numRows = vidObj.Height;
 numCols = vidObj.Width;
+duration = vidObj.Duration;
+
+%Convert to fixed point
+numFrames_fi = floatToFix(numFrames, frac);
+numFramesInv_fi = floatToFix(numFramesInv, frac);
+numRows_fi = floatToFix(numRows, frac);
+numCols_fi = floatToFix(numCols, frac);
+duration_fi = floatToFix(duration, frac);
 
 %% INITIALIZE KALMAN VARIABLES
-x_old = [numCols/2, 0, 0, 0]';
-P_old = eye(4);
-t_step = vidObj.Duration / numFrames;
+middle_fi = numCols_fi * floatToFix(.5, frac);
+x_old_fi = [middle_fi, 0, 0, 0]'; %F = 2*frac
+P_old_fi = floatToFix(eye(4), frac);
+t_step_fi = duration_fi * numFramesInv_fi; %F = 2*frac
 
 %% INITIALIZE FILTER VARIABLE
-THRESH = 90;
+THRESH_fi = floatToFix(90, frac);
 
 %% ALGORITHM
 tic;
 
 %Compute the base frame grayscale, all other frames will use this to look for motion
 baseFrameRGB = read(vidObj, 1);
-GS_BASE = RGB2GRAY(baseFrameRGB);
+GS_BASE_fi = RGB2GRAY(baseFrameRGB);
 
 %Iterate through the remaining frames looking for motion
 for i = 2 : numFrames
        
-    %Read current frame
+    %Read and convert current frame
     currFrameRGB = read(vidObj, i);
-    currFrameRGB = double(currFrameRGB);
-    
-	%Convert current frame
-	GS_CURR = RGB2GRAY(currFrameRGB);
+	GS_CURR_fi = RGB2GRAY(currFrameRGB);
     
 	%Compute and filter delta frame
-	[delta, THRESH] = deltaFrame(GS_CURR, GS_BASE, THRESH);
+	[delta, THRESH_fi] = deltaFrame(GS_CURR_fi, GS_BASE_fi, THRESH_fi);
     
     %Use edge detection to apply a median filter and reduce noise
     filteredDelta = medianFilter(delta, THRESH);
