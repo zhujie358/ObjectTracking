@@ -6,6 +6,12 @@
 % @brief Floating point software attempt number 3. This version uses the
 % Delta Frame generation from v2 with Kalman filtering for predictions.
 
+%% FIXED-POINT FORMAT SPECIFICATIONS
+global frac
+global word;
+frac = 10; %Trial and error for best results
+word = 10; %Max value of script is 1000
+
 %% INPUT-OUTPUT VIDEO OBJECTS
 vidObj = VideoReader('sample_input_1.mp4');
 vidObj2 = VideoWriter('./ECSE 456/ObjectTracking/sw/sample_output_1');

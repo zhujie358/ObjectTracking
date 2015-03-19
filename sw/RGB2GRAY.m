@@ -14,9 +14,23 @@ R = .2126; %Red coefficient for colorimetric RGB-Grayscale conversion
 G = .7152; %Green coefficient for colorimetric RGB-Grayscale conversion 
 B = .0722; %Blue coefficient for colorimetric RGB-Grayscale conversion 
 
-%% CONVERSION
-GS_FRAME = R*RGB_FRAME(:,:,1) + G*RGB_FRAME(:,:,2) + B*RGB_FRAME(:,:,3);
-GS_FRAME = double(GS_FRAME);
-GS_FRAME = fix(GS_FRAME);
+%% FIXED-POINT CONVERSION
+global frac;
+
+%Convert all values to fixed point representation, F = frac
+R_fi = floatToFix(R, frac);
+R_frame_fi = floatToFix(RGB_FRAME(:,:,1), frac);
+G_fi = floatToFix(G, frac);
+G_frame_fi = floatToFix(RGB_FRAME(:,:,2), frac);
+B_fi = floatToFix(B, frac);
+B_frame_fi = floatToFix(RGB_FRAME(:,:,3), frac);
+
+%Perform fixed point multiplication, F = 2*frac 
+RR_frame = R_fi * R_frame_fi;
+GG_frame = G_fi * G_frame_fi;
+BB_frame = B_fi * B_frame_fi;
+
+%Apply the RGB to Grayscale formula, F = 2*frac
+GS_FRAME = RR_frame + GG_frame + BB_frame;
 
 end
