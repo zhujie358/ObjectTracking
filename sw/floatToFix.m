@@ -3,7 +3,7 @@
 % @author Benjamin Brown (bbrown1867@gmail.com)
 % @author Taylor Dotsikas (taylor.dotsikas@mail.mcgill.ca)
 % @date March 19th, 2015
-% @brief Function to filter delta frame based on median of neighbors
+% @brief Converts a floating point object to fixed point representation
 % @param float: Floating point object
 % @param F: Fractional portion length
 % @retval fixed: Fixed point object
