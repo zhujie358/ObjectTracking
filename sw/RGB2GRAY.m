@@ -34,5 +34,11 @@ BB_frame = B_fi * B_frame_fi;
 
 %Apply the RGB to Grayscale formula, F = 2*frac
 GS_FRAME = RR_frame + GG_frame + BB_frame;
+%Chop extra bits for precision that aren't needed
+%In VHDL this is done by only taking bits left of 2*frac
+GS_FRAME = GS_FRAME * 2^(-2*frac);
+GS_FRAME = dec2bin(GS_FRAME);
+GS_FRAME = bin2dec(GS_FRAME);
+%Now frac = 0
 
 end
