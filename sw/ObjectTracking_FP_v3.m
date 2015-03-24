@@ -9,7 +9,7 @@
 %% FIXED-POINT FORMAT SPECIFICATIONS
 global frac
 global word;
-frac = 10; %Trial and error for best results (at least 7)
+frac = 14; %Trial and error for best results (at least 14)
 word = 10; %Max value of script is 1000
 
 %% INPUT-OUTPUT VIDEO OBJECTS
@@ -47,6 +47,7 @@ tic;
 
 %Compute the base frame grayscale, all other frames will use this to look for motion
 baseFrameRGB = read(vidObj, 1);
+baseFrameRGB = double(baseFrameRGB);
 GS_BASE_fi = RGB2GRAY(baseFrameRGB); %F = 0
 
 %Iterate through the remaining frames looking for motion
@@ -54,6 +55,7 @@ for i = 2 : numFrames
        
     %Read and convert current frame
     currFrameRGB = read(vidObj, i);
+    currFrameRGB = double(currFrameRGB);
 	GS_CURR_fi = RGB2GRAY(currFrameRGB); %F = 0
     
 	%Compute and filter delta frame
