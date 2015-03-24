@@ -4,22 +4,25 @@
 % @author Taylor Dotsikas (taylor.dotsikas@mail.mcgill.ca)
 % @date March 10th, 2015
 % @brief Function to filter delta frame based on median of neighbors
-% @param delta: MxN delta frame
-% @param THRESH: Threshold for filtering
-% @retval modDelta: MxN filtered delta frame
+% @param delta_fi: MxN delta frame
+% @param THRESH_fi: Threshold for filtering
+% @retval modDelta_fi: MxN filtered delta frame
 
-function [modDelta]= medianFilter(delta, THRESH)
+function [modDelta_fi]= medianFilter(delta_fi, THRESH_fi)
+
+%Delta comes in in FI with F = 0 
+%Thresh also comes in FI with F = 0
 
 %Result matrix
-[m,n] = size(delta);
-modDelta = delta;
+[m,n] = size(delta_fi);
+modDelta_fi = delta_fi;
 
 %Iterate through all points
 for i = 1 : m
 	for j = 1 : n
 	
 		%Identify an object point
-		if (delta(i,j) ~= 0)
+		if (delta_fi(i,j) ~= 0)
 		
 			%Point ID values
 			info_score = 0;
@@ -50,11 +53,11 @@ for i = 1 : m
 					end
 					
 					%Check the neighbouring 5 points 
-                    neighborhood = [delta(i,j+q);
-					delta(i+p,j+q);
-					delta(i+p,j);
-					delta(i+p,j-q);
-					delta(i,j-q)];
+                    neighborhood_fi = [delta_fi(i,j+q);
+					delta_fi(i+p,j+q);
+					delta_fi(i+p,j);
+					delta_fi(i+p,j-q);
+					delta_fi(i,j-q)];
 				
 				%Left/right border case
 				elseif(flag == 2)
@@ -68,11 +71,11 @@ for i = 1 : m
 					end
 					
 					%Check the neighbouring 5 points 
-					neighborhood = [delta(i-p,j);
-					delta(i-p,j+q);
-					delta(i,j+q);
-					delta(i+p,j+q);			
-					delta(i+p,j)];
+					neighborhood_fi = [delta_fi(i-p,j);
+					delta_fi(i-p,j+q);
+					delta_fi(i,j+q);
+					delta_fi(i+p,j+q);			
+					delta_fi(i+p,j)];
 				
 				end			
 				
@@ -89,29 +92,36 @@ for i = 1 : m
 				end
 				
 				%Check the neighbouring 3 points
-                neighborhood = [delta(i+p,j); 
-                    delta(i,j+q);
-                    delta(i+p,j+q)];
+                neighborhood_fi = [delta_fi(i+p,j); 
+                    delta_fi(i,j+q);
+                    delta_fi(i+p,j+q)];
 			else 
-                neighborhood = zeros(24, 1);
+                neighborhood_fi = zeros(24, 1);
                 p = 1;
                 for k = -2 : 2
                     for l = -2 : 2
                         if (k == 0 && l ==0)
                             %Do nothing
                         else
-                            neighborhood(p,1) = delta(i+k, j-l);
+                            neighborhood_fi(p,1) = delta_fi(i+k, j-l);
                             p = p + 1;
                         end
                     end
                 end
             end
-            modDelta(i,j) = myMedian(neighborhood);
+            %So we replaced the point with the median of its neighbors
+            %neighborbood is just a collecion of points from delta (which
+            %is fixed point), so it is also fixed point. However the median
+            %might not be if we are taking the average of two middle points
+            modDelta_fi(i,j) = myMedian(neighborhood_fi);
         end
 	end
 end
 
-temp = modDelta(:,:) < THRESH;
-modDelta = modDelta - modDelta.*temp;
+%Since modDelta just takes a median of the neighborhood, it's just
+%replacing a fixed point value with another fixed point value, so we're
+%good here. F = 0 for result.
+temp = modDelta_fi(:,:) < THRESH_fi;
+modDelta_fi = modDelta_fi - modDelta_fi.*temp;
 	
 end

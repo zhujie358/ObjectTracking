@@ -9,7 +9,7 @@
 %% FIXED-POINT FORMAT SPECIFICATIONS
 global frac
 global word;
-frac = 10; %Trial and error for best results
+frac = 10; %Trial and error for best results (at least 7)
 word = 10; %Max value of script is 1000
 
 %% INPUT-OUTPUT VIDEO OBJECTS
@@ -24,18 +24,20 @@ numRows = vidObj.Height;
 numCols = vidObj.Width;
 duration = vidObj.Duration;
 
-%Convert to fixed point, F = frac for all
-numFrames_fi = floatToFix(numFrames, frac);
+%Convert to fixed point: rows, cols, and frames will be integers anyways,
+%so just say F = 0 (i.e. do nothing). The rest have F = frac
+numFrames_fi = floatToFix(numFrames, 0); 
 numFramesInv_fi = floatToFix(numFramesInv, frac);
-numRows_fi = floatToFix(numRows, frac);
-numCols_fi = floatToFix(numCols, frac);
+numRows_fi = floatToFix(numRows, 0);
+numCols_fi = floatToFix(numCols, 0);
 duration_fi = floatToFix(duration, frac);
 
 %% INITIALIZE KALMAN VARIABLES
-middle_fi = numCols_fi * floatToFix(.5, frac); %F = 2*frac
-x_old_fi = [middle_fi, 0, 0, 0]'; %F = 2*frac
-P_old_fi = floatToFix(eye(4), frac); %F = frac
-t_step_fi = duration_fi * numFramesInv_fi; %F = 2*frac
+oneHalf_fi = floatToFix(.5, 2); 
+middle_fi = numCols_fi * oneHalf_fi; %F = 0 + 2 = 2
+x_old_fi = [middle_fi, 0, 0, 0]'; %F = 2
+P_old_fi = eye(4); %F = 0;
+t_step_fi = duration_fi * numFramesInv_fi; %F = frac + frac = 2*frac;
 
 %% INITIALIZE FILTER VARIABLE
 THRESH_fi = 90; %F = 0
@@ -57,20 +59,18 @@ for i = 2 : numFrames
 	%Compute and filter delta frame
 	[delta_fi, THRESH_fi] = deltaFrame(GS_CURR_fi, GS_BASE_fi, THRESH_fi);
     
-    %UP TO HERE IN FIXED-POINT CONVERSION
-    
     %Use edge detection to apply a median filter and reduce noise
-    filteredDelta = medianFilter(delta_fi, THRESH);
+    filteredDelta_fi = medianFilter(delta_fi, THRESH_fi);
     
     %Based on the delta frame, detemine its (x,y) position
-    z = measure(filteredDelta);
-  
+    z_fi = measure(filteredDelta_fi);
+      
     %Perform a Kalman filter iteration based on this measurement
-    [x_new, P_new] = applyKalman(z, x_old, P_old, t_step);
+    [x_new, P_new] = applyKalman(z_fi, x_old_fi, P_old_fi, t_step_fi);
     
     %Save for next iteration
-    P_old = P_new;
-    x_old = x_new;
+    P_old_fi = P_new;
+    x_old_fi = x_new;
     
     %Draw a red box dot at the post-Kalman filtered position
     x = fix(x_new(1));
