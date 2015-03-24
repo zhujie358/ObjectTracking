@@ -11,6 +11,8 @@
 
 function [delta_fi, NEW_THRESH_fi] = deltaFrame(curr_fi, base_fi, INIT_THRESH_fi)
 
+    global frac;
+
 	%Compute delta frame, F = 0
     delta_fi = abs(curr_fi - base_fi);
     
@@ -34,5 +36,5 @@ function [delta_fi, NEW_THRESH_fi] = deltaFrame(curr_fi, base_fi, INIT_THRESH_fi
     NEW_THRESH_fi = NEW_THRESH_fi * 2^(-(2*frac+1));
     NEW_THRESH_fi = dec2bin(NEW_THRESH_fi);
     NEW_THRESH_fi = bin2dec(NEW_THRESH_fi);
-    %Now frac = 0
+    %Now F = 0
 end

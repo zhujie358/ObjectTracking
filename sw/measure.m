@@ -101,7 +101,6 @@ denom = (x1 - x2)*(y3 - y4) - (y1 - y2)*(x3 - x4);
 
 %Now, we finally some code where fractions may be produced, and need to
 %handle it accordingly.
-
 if (denom == 0)
 	%The lines are parallel
     F = 2;
@@ -109,8 +108,6 @@ if (denom == 0)
 	x_fi = (x1 + x2)*oneHalf_fi; %F = 2
 	y_fi = (y1 + y2)*oneHalf_fi; %F = 2
 else
-    %FLAG: THIS IS A PLACE WHERE FRAC MAY NEED TO BE RAISED IF DENOM IS
-    %SUPER LARGE THAN YOU WILL NEED A LARGE FRAC TO REPRESENT ITS INVERSE
     F = frac;
     %Any sum, diff or product of x1-x4, y1-y4 can be left since it will be 
     %fixed point with F = 0
@@ -133,6 +130,7 @@ y = bin2dec(y);
 
 %construct z matrix
 z_fi = [x; y];
+%Now F = 0
 
 end
 
