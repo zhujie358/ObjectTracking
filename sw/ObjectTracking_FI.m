@@ -13,44 +13,45 @@ vidObj = VideoReader('sample_input_1.mp4');
 vidObj2 = VideoWriter('./ECSE 456/ObjectTracking/sw/sample_output_1');
 open(vidObj2);
 
-%% INITIALIZE VIDEO CONSTANTS
+%% INITIALIZE VIDEO CONSTANTS (FLOATING-POINT)
 numFrames = vidObj.NumberOfFrames;
 numFramesInv = 1 / numFrames;
 numRows = vidObj.Height;
 numCols = vidObj.Width;
 duration = vidObj.Duration;
 
-% CONVERT VIDEO CONSTANTS TO FI
+%% CONVERT VIDEO CONSTANTS TO FIXED-POINT
 numFrames_fi = floatToFix(numFrames, 0); %F = 0
-numFramesInv_fi = floatToFix(numFramesInv, 14); %F = 14
+numFramesInv_fi = floatToFix(numFramesInv, 9); %F = 9
 numRows_fi = floatToFix(numRows, 0); %F = 0
 numCols_fi = floatToFix(numCols, 0); %F = 0
 duration_fi = floatToFix(duration, 3); %F = 3
 
-%% INITIALIZE KALMAN VARIABLES IN FI
+%% INITIALIZE KALMAN VARIABLES IN FIXED-POINT
 oneHalf_fi = floatToFix(.5, 2); %F = 2
-middle_fi = numCols_fi * oneHalf_fi; %F = 2
-x_old_fi = [middle_fi, 0, 0, 0]'; %W = 32, F = 2
+[middle_fi, middle_F] = fixedMult(numCols_fi, 0, oneHalf_fi, 2); %F = 2
+x_old_fi = [middle_fi, 0, 0, 0]'; %F = 2
 P_old_fi = floatToFix(eye(4), 0); %F = 0
-t_step_fi = duration_fi * numFramesInv_fi; 
+t_step_fi = fixedMult(duration_fi, 3, numFramesInv_fi, 9); %F = 12
+t_step_fi = floatToFix(t_step_fi, -6); %Normalize to F = 6
 
 %% INITIALIZE FILTER VARIABLE
-THRESH_fi = 90; %F = 0
+THRESH_fi = floatToFix(90, 0); %F = 0
 
 %% ALGORITHM
 tic;
 
 %Compute the base frame grayscale, all other frames will use this to look for motion
-baseFrameRGB = read(vidObj, 1);
-baseFrameRGB = double(baseFrameRGB);
+baseFrameRGB = read(vidObj, 1); %8-bit integers (0-255)
+baseFrameRGB = uint16(baseFrameRGB); %Extend to 16-bit integers (0-65535)
 GS_BASE_fi = RGB2GRAY(baseFrameRGB); %F = 0
 
 %Iterate through the remaining frames looking for motion
 for i = 2 : numFrames
        
     %Read and convert current frame
-    currFrameRGB = read(vidObj, i);
-    currFrameRGB = double(currFrameRGB);
+    currFrameRGB = read(vidObj, i); %8-bit integers (0-255)
+    currFrameRGB = uint16(currFrameRGB); %Extend to 16-bit integers (0-65535)
 	GS_CURR_fi = RGB2GRAY(currFrameRGB); %F = 0
     
 	%Compute and filter delta frame
@@ -114,8 +115,8 @@ for i = 2 : numFrames
         end
     end
     
-	%For output purposes
-	currFrameRGB = currFrameRGB / 256;
+	%IGNORE FOR FIXED-POINT CONVERSION, THIS IS JUST FOR MATLAB
+	currFrameRGB = double(currFrameRGB) / 256;
 	writeVideo(vidObj2, currFrameRGB);
 end
 

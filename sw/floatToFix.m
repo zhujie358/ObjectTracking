@@ -14,5 +14,9 @@ function [fixed] = floatToFix(float, F)
 d = float .* 2^(F);
 fixed = round(d);
 
+%Error checking
+if (float(1,1) ~= 0 && fixed(1,1) == 0)
+    disp('ERROR: The chosen F is too small to represent this value.');
 end
 
+end
