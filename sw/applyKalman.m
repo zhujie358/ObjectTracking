@@ -16,50 +16,85 @@
 % current iteration (k)
 
 function [x_new, P_new] = applyKalman(z_fi, x_old_fi, P_old_fi, t_step_fi)
+    %% INPUT FIXED-POINT INFO
+    %z_fi --> F = 0
+    %x_old_fi --> F = 2
+    %P_old_fi --> F = 0
+    %t_step_fi --> F = 6
+    
+    %% FIXED-POINT CONSTANTS
+    inv_precision = 14;
 
-%The four inputs come in fixed-point with the following fracational
-%portions:
-global frac;
-%z_fi ----> F = 0
-%x_old_fi ----> F = 2
-%P_old_fi ----> F = 0
-%t_step_fi ----> F = 2*frac
+    %% INITIALIZE USER DETERMINED, STATIC VARIABLES
+    oneFI = floatToFix(1, 6); %F = 6
+    F_fi = [oneFI 0 t_step_fi 0; 0 oneFI 0 t_step_fi; 0 0 oneFI 0; 0 0 0 oneFI]; %F = 6
+    H = [1 0 0 0; 0 1 0 0]; 
+    H_fi = floatToFix(H, 0); %F = 0
 
-%% INITIALIZE USER DETERMINED, STATIC VARIABLES
-oneFI = floatToFix(1, 2*frac);
-%Since F (the matrix) consists of numbers with F = 2*frac it has F = 2*frac
-F_fi = [oneFI 0 t_step_fi 0; 0 oneFI 0 t_step_fi; 0 0 oneFI 0; 0 0 0 oneFI];
-H_fi = [1 0 0 0; 0 1 0 0]; %F = 0
+    %Here we copy the error matrices from the kalmanfilter.m example code since
+    %we are currently unable to characterize the error vectors above
+    Q = eye(4);
+    R = 1000 * eye(2); 
 
-%Here we copy the error matrices from the kalmanfilter.m example code since
-%we are currently unable to characterize the error vectors above
-Q = eye(4);
-R = 1000 * eye(2); 
+    %% PREDICTION EQUATIONS
+    x_new_pred_fi = fixedMult(F_fi, 6, x_old_fi, 2); %F = 8 
+    
+    Q_fi = floatToFix(Q, 12); %F = 12
+    temp_fi_1 = fixedMult(F_fi, 6, P_old_fi, 0); %F = 6
+    temp_fi_2 = fixedMult(temp_fi_1, 6, F_fi', 6); %F = 12
+    P_new_pred_fi = temp_fi_2 + Q_fi; %F = 12
+    
+    %% NORMALIZE
+    x_new_pred_fi = floatToFix(x_new_pred_fi, -2); %F = 6
+    P_new_pred_fi = floatToFix(P_new_pred_fi, -6); %F = 6
+    
+    %% INTERMEDIATE CALCULATIONS
+    z_fi_norm = floatToFix(z_fi, 6); 
+    temp_fi_3 = fixedMult(H_fi, 0, x_new_pred_fi, 6); %F = 6
+    y_fi = z_fi_norm - temp_fi_3; %F = 6
+    
+    R_fi = floatToFix(R, 6); %F = 6
+    temp_fi_4 = fixedMult(H_fi, 0, P_new_pred_fi, 6); %F = 6
+    temp_fi_5 = fixedMult(temp_fi_4, 6, H_fi', 0); %F = 6
+    S_fi = temp_fi_5 + R_fi; %F = 6
+    temp_fi_6 = fixedMult(S_fi(1), 6, S_fi(4), 6); %F = 12
+    temp_fi_7 = fixedMult(S_fi(2), 6, S_fi(3), 6); %F = 12
+    detS_fi = temp_fi_6 - temp_fi_7; %F = 12
+    
+    %% NORMALIZE
+    detS_fi = floatToFix(detS_fi, -12); %F = 0
+    
+    %% INTERMEDIATE CALCULATIONS
+    inv_detS_fi = floatToFix((1/detS_fi), inv_precision); %F = inv_precision
+    swapped_S_fi = [S_fi(4) -S_fi(2); -S_fi(3) S_fi(1)]; %F = 6
+    S_inv_fi = fixedMult(swapped_S_fi, 6, inv_detS_fi, inv_precision); %F = inv_precision+6
+    
+    %% NORMALIZE
+    S_inv_fi = floatToFix(S_inv_fi, -inv_precision); %F = 6
+    
+    %% INTERMEDIATE CALCULATIONS
+    temp_fi_8 = fixedMult(P_new_pred_fi, 6, H_fi', 0); %F = 6
+    K_fi = fixedMult(temp_fi_8, 6, S_inv_fi, 6); %F = 12
 
-%% PREDICTION EQUATIONS
-x_new_pred_fi = F_fi * x_old_fi; %F = 2*frac + 2
-%So for the next equation have to give Q the same F as the product. The
-%product will have F = 2*frac + 0 + 2*frac = 4*frac.
-Q_fi = floatToFix(Q, 4*frac);
-P_new_pred_fi = F_fi*P_old_fi*F_fi' + Q_fi; %F = 4*frac
-
-%% INTERMEDIATE CALCULATIONS
-%So the product in the y equation will have F = 0 + 2*frac + 2, so we will
-%need to normalize z_fi to have the same, which currently has F = 0\
-z_fi_norm = floatToFix(z_fi, 2*frac+2); %F = 2*frac + 2
-y_fi = z_fi_norm - H_fi*x_new_pred_fi; %F = 2*frac + 2
-%The product in the S equation will have F = 0 + 4*frac + 0, so need to
-%normalize R to the same value
-R_fi = floatToFix(R, 4*frac); %F = 4*frac
-S_fi = H_fi*P_new_pred_fi*H_fi' + R_fi; %F = 4*frac
-detS = (S_fi(1)*S_fi(4) - S_fi(2)*S_fi(3)); %F = 4*frac
-inv_detS_fi = floatToFix((1/detS), frac);
-S_inv_fi = inv_detS_fi * [S_fi(4) -S_fi(2); -S_fi(3) S_fi(1)]; %F = frac + 4*frac = 5*frac
-K_fi = P_new_pred_fi*H_fi'*S_inv_fi; %F = 4*frac + 0 + 5*frac = 9*frac
-
-%% UPDATE EQUATIONS
-x_new = x_new_pred_fi + K_fi*y_fi;
-P_new = (eye(4) - K_fi*H_fi)*P_new_pred_fi;
-
+    %% NORMALIZE
+    K_fi = floatToFix(K_fi, -6); %F = 6
+    
+    %% UPDATE EQUATIONS
+    temp_fi_9 = fixedMult(K_fi, 6, y_fi, 6); %F = 12
+    
+    %% NORMALIZE
+    temp_fi_9 = floatToFix(temp_fi_9, -6); %F = 6
+    
+    %% UPDATE EQUATIONS
+    x_new_fi = x_new_pred_fi + temp_fi_9; %F = 6
+    
+    temp_fi_10 = fixedMult(K_fi, 6, H_fi, 0); %F = 6
+    eye4_fi = floatToFix(eye(4), 6); %F = 6
+    temp_fi_11 = eye4_fi - temp_fi_10; %F = 6
+    P_new_fi = fixedMult(temp_fi_11, 6, P_new_pred_fi, 6); %F = 12
+    
+    %% NORMALIZE
+    x_new = floatToFix(x_new_fi, -6); %F = 0
+    P_new = floatToFix(P_new_fi, -12); %F = 0
 end
 

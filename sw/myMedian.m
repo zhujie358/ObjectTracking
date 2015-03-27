@@ -27,10 +27,13 @@ function [median_fi]= myMedian(a)
     %Following the notation in the algorithm
     n = rows; %F = 0
     oneHalf_fi = floatToFix(.5, 2); %F = 2
-    [n_fi, F1] = fixedMult(n, 0, oneHalf_fi, 2); %F = 2
+    [k_fi, F1] = fixedMult(n, 0, oneHalf_fi, 2); %F = 2
     
-    %% NORMALIZE
-    k = floatToFix(n_fi, -F1); %F = 0
+    %% NORMALIZE (WE DON'T USE floatToFix HERE IN ORDER TO ROUND DOWN)
+    %Even though these next two lines are floating-point, remember that we
+    %would bypass this in VHDL by just chopping all bits right of F1.
+    k = k_fi * 2^(-F1);
+    k = floor(k); 
 
     %% SORTING ALGORITHM
     %Start kth-smallest algorithm

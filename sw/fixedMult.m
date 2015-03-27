@@ -21,6 +21,8 @@ F = F1 + F2;
 testBin = dec2bin(result(1,1));
 if (length(testBin) > 16)
     disp('ERROR: More than 16 bits are needed to represent this number.');
+    disp(result);
+    disp(length(testBin));
 end
     
 

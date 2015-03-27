@@ -55,16 +55,18 @@ for i = 2 : numFrames
 	GS_CURR_fi = RGB2GRAY(currFrameRGB); %F = 0
     
 	%Compute and filter delta frame
-	[delta_fi, THRESH_fi] = deltaFrame(GS_CURR_fi, GS_BASE_fi, THRESH_fi);
+	[delta_fi, THRESH_fi] = deltaFrame(GS_CURR_fi, GS_BASE_fi, THRESH_fi); %F = 0, F = 0
     
     %Use edge detection to apply a median filter and reduce noise
-    filteredDelta_fi = medianFilter(delta_fi, THRESH_fi);
+    filteredDelta_fi = medianFilter(delta_fi, THRESH_fi); %F = 0
     
     %Based on the delta frame, detemine its (x,y) position
     z_fi = measure(filteredDelta_fi);
       
     %Perform a Kalman filter iteration based on this measurement
-    [x_new, P_new] = applyKalman(z_fi, x_old_fi, P_old_fi, t_step_fi);
+    [x_new, P_new] = applyKalman(z_fi, x_old_fi, P_old_fi, t_step_fi); %F = 0, F = 0
+    
+    %NO FLOATING-POINT OPERATIONS AFTER THIS POINT
     
     %Save for next iteration
     P_old_fi = P_new;
