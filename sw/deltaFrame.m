@@ -21,7 +21,9 @@ function [delta_fi, NEW_THRESH_fi] = deltaFrame(curr_fi, base_fi, INIT_THRESH_fi
     
     %% MEAN-FILTER DELTA FRAME
     deltaP = delta_fi(:,:) < INIT_THRESH_fi; %F = 0
+    deltaP = uint16(deltaP); %Covert boolean to uint16 for MATLAB
     deltaX = delta_fi(:,:) >= INIT_THRESH_fi; %F = 0
+    deltaX = uint16(deltaX); %Covert boolean to uint16 for MATLAB
     delta_fi = delta_fi - delta_fi.*deltaP; %F = 0
     back_fi = delta_fi - delta_fi.*deltaX; %F = 0
     delta_avg_fi = myMean(delta_fi); %F = 14

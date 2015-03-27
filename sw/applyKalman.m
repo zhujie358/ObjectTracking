@@ -23,7 +23,7 @@ function [x_new, P_new] = applyKalman(z_fi, x_old_fi, P_old_fi, t_step_fi)
     %t_step_fi --> F = 6
     
     %% FIXED-POINT CONSTANTS
-    inv_precision = 14;
+    inv_precision = 20;
 
     %% INITIALIZE USER DETERMINED, STATIC VARIABLES
     oneFI = floatToFix(1, 6); %F = 6

@@ -120,6 +120,7 @@ function [modDelta_fi]= medianFilter(delta_fi, THRESH_fi)
         end
     end
     temp = modDelta_fi(:,:) < THRESH_fi; %F = 0
+    temp = uint16(temp); %Covert boolean to uint16 for MATLAB
     modDelta_fi = modDelta_fi - modDelta_fi.*temp; %F = 0
 	
 end
