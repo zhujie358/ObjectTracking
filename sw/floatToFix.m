@@ -10,13 +10,12 @@
 
 function [fixed] = floatToFix(float, F)
 
-%Steps 1 and 2 in the process
-d = float .* 2^(F);
-fixed = round(d);
+    d = float .* 2^(F);
+    fixed = round(d);
 
-%Error checking
-if (float(1,1) ~= 0 && fixed(1,1) == 0)
-    disp('ERROR: The chosen F is too small to represent this value.');
-end
+    %Verify that enough fractional bits were used to represent this number
+    if (float(1,1) ~= 0 && fixed(1,1) == 0)
+        disp('ERROR: The chosen F is too small to represent this value.');
+    end
 
 end

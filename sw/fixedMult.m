@@ -13,17 +13,7 @@
 
 function [result, F] = fixedMult(fix1, F1, fix2, F2)
 
-%Algorithm
-result = fix1*fix2;
-F = F1 + F2;
-
-%Error checking
-testBin = dec2bin(result(1,1));
-if (length(testBin) > 16)
-    disp('ERROR: More than 16 bits are needed to represent this number.');
-    disp(result);
-    disp(length(testBin));
-end
-    
+    result = fix1*fix2;
+    F = F1 + F2;
 
 end

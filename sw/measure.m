@@ -102,16 +102,16 @@ function [z_fi] = measure(edges_fi)
     if (denom == 0)
         %The lines are parallel
         F = 2;
-        oneHalf_fi = floatToFix(.5, F); 
+        oneHalf_fi = floatToFix(.5, F); %F = 2
         x_fi = (x1 + x2)*oneHalf_fi; %F = 2
         y_fi = (y1 + y2)*oneHalf_fi; %F = 2
     else
         F = 17;
         x_temp = (((x1*y2) - (y1*x2))*(x3 - x4) - (x1 - x2)*((x3*y4) - (y3*x4))); %F = 0
         y_temp = (((x1*y2) - (y1*x2))*(y3 - y4) - (y1 - y2)*((x3*y4) - (y3*x4))); %F = 0
-        invDenom_fi = floatToFix((1/denom), F); %F = 16
-        x_fi = x_temp * invDenom_fi; %F = 16
-        y_fi = y_temp * invDenom_fi; %F = 16
+        invDenom_fi = floatToFix((1/denom), F); %F = 17
+        x_fi = fixedMult(x_temp, 0, invDenom_fi, F); %F = 17
+        y_fi = fixedMult(y_temp, 0, invDenom_fi, F); %F = 17
     end
 
     %% NORMALIZE

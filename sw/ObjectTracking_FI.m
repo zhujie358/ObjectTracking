@@ -6,8 +6,6 @@
 % @brief Fixed-point software that performs object tracking 
 % using delta frame generation and a Kalman filter. 
 
-%16-BIT ARCHITECTURE: W = 16 FOR ALL NUMBERS UNLESS STATED OTHERWISE
-
 %% INPUT-OUTPUT VIDEO OBJECTS
 vidObj = VideoReader('sample_input_1.mp4');
 vidObj2 = VideoWriter('./ECSE 456/ObjectTracking/sw/sample_output_1');

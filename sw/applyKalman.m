@@ -23,78 +23,72 @@ function [x_new, P_new] = applyKalman(z_fi, x_old_fi, P_old_fi, t_step_fi)
     %t_step_fi --> F = 6
     
     %% FIXED-POINT CONSTANTS
-    inv_precision = 20;
-
+    inv_precision = 32;
+    z_precision = 0;
+    x_precision = 2;
+    p_precision = 0;
+    t_precision = 6;
+    h_precision = 0;
+    q_precision = 0; 
+    r_precision = 0;
+    
     %% INITIALIZE USER DETERMINED, STATIC VARIABLES
-    oneFI = floatToFix(1, 6); %F = 6
-    F_fi = [oneFI 0 t_step_fi 0; 0 oneFI 0 t_step_fi; 0 0 oneFI 0; 0 0 0 oneFI]; %F = 6
+    oneFI = floatToFix(1, t_precision); 
+    F_fi = [oneFI 0 t_step_fi 0; 0 oneFI 0 t_step_fi; 0 0 oneFI 0; 0 0 0 oneFI]; 
+    f_precision = t_precision;
+    
     H = [1 0 0 0; 0 1 0 0]; 
-    H_fi = floatToFix(H, 0); %F = 0
-
-    %Here we copy the error matrices from the kalmanfilter.m example code since
-    %we are currently unable to characterize the error vectors above
+    H_fi = floatToFix(H, h_precision); 
+    
     Q = eye(4);
+    Q_fi = floatToFix(Q, q_precision);
+    
     R = 1000 * eye(2); 
+    R_fi = floatToFix(R, r_precision);
 
     %% PREDICTION EQUATIONS
-    x_new_pred_fi = fixedMult(F_fi, 6, x_old_fi, 2); %F = 8 
+    [x_new_pred_fi, xnewp_precision] = fixedMult(F_fi, f_precision, x_old_fi, x_precision);
     
-    Q_fi = floatToFix(Q, 12); %F = 12
-    temp_fi_1 = fixedMult(F_fi, 6, P_old_fi, 0); %F = 6
-    temp_fi_2 = fixedMult(temp_fi_1, 6, F_fi', 6); %F = 12
-    P_new_pred_fi = temp_fi_2 + Q_fi; %F = 12
-    
-    %% NORMALIZE
-    x_new_pred_fi = floatToFix(x_new_pred_fi, -2); %F = 6
-    P_new_pred_fi = floatToFix(P_new_pred_fi, -6); %F = 6
+    [temp_fi_1, t1_precision] = fixedMult(F_fi, f_precision, P_old_fi, p_precision);
+    [temp_fi_2, t2_precision] = fixedMult(temp_fi_1, t1_precision, F_fi', f_precision); 
+    [P_new_pred_fi, pnewp_precision] = fixedAdd(temp_fi_2, t2_precision, Q_fi, q_precision);
     
     %% INTERMEDIATE CALCULATIONS
-    z_fi_norm = floatToFix(z_fi, 6); 
-    temp_fi_3 = fixedMult(H_fi, 0, x_new_pred_fi, 6); %F = 6
-    y_fi = z_fi_norm - temp_fi_3; %F = 6
+    [temp_fi_3, t3_precision] = fixedMult(H_fi, h_precision, x_new_pred_fi, xnewp_precision); 
+    [y_fi, y_precision] = fixedAdd(z_fi, z_precision, temp_fi_3, t3_precision);
     
-    R_fi = floatToFix(R, 6); %F = 6
-    temp_fi_4 = fixedMult(H_fi, 0, P_new_pred_fi, 6); %F = 6
-    temp_fi_5 = fixedMult(temp_fi_4, 6, H_fi', 0); %F = 6
-    S_fi = temp_fi_5 + R_fi; %F = 6
-    temp_fi_6 = fixedMult(S_fi(1), 6, S_fi(4), 6); %F = 12
-    temp_fi_7 = fixedMult(S_fi(2), 6, S_fi(3), 6); %F = 12
-    detS_fi = temp_fi_6 - temp_fi_7; %F = 12
+    [temp_fi_4, t4_precision] = fixedMult(H_fi, t_precision, P_new_pred_fi, pnewp_precision); 
+    [temp_fi_5, t5_precision] = fixedMult(temp_fi_4, t4_precision, H_fi', h_precision);
+    [S_fi, s_precision] = fixedAdd(temp_fi_5, t5_precision, R_fi, r_precision); 
     
-    %% NORMALIZE
-    detS_fi = floatToFix(detS_fi, -12); %F = 0
+    %% INVERT S
+    [temp_fi_6, t6_precision] = fixedMult(S_fi(1), s_precision, S_fi(4), s_precision); 
+    [temp_fi_7, t7_precision] = fixedMult(S_fi(2), s_precision, S_fi(3), s_precision); 
+    [detS_fi, detS_precision] = fixedAdd(temp_fi_6, t6_precision, -temp_fi_7, t7_precision);
     
-    %% INTERMEDIATE CALCULATIONS
-    inv_detS_fi = floatToFix((1/detS_fi), inv_precision); %F = inv_precision
-    swapped_S_fi = [S_fi(4) -S_fi(2); -S_fi(3) S_fi(1)]; %F = 6
-    S_inv_fi = fixedMult(swapped_S_fi, 6, inv_detS_fi, inv_precision); %F = inv_precision+6
+    %Floating-point 
+    detS = detS_fi*2^(-detS_precision);
+    inv_detS = 1 / detS;
     
-    %% NORMALIZE
-    S_inv_fi = floatToFix(S_inv_fi, -inv_precision); %F = 6
+    %Back to fixed-point
+    inv_detS_fi = floatToFix(inv_detS, inv_precision); 
+    swapped_S_fi = [S_fi(4) -S_fi(2); -S_fi(3) S_fi(1)]; 
+    [S_inv_fi, sinv_precision] = fixedMult(swapped_S_fi, s_precision, inv_detS_fi, inv_precision);
     
     %% INTERMEDIATE CALCULATIONS
-    temp_fi_8 = fixedMult(P_new_pred_fi, 6, H_fi', 0); %F = 6
-    K_fi = fixedMult(temp_fi_8, 6, S_inv_fi, 6); %F = 12
-
-    %% NORMALIZE
-    K_fi = floatToFix(K_fi, -6); %F = 6
+    [temp_fi_8, t8_precision] = fixedMult(P_new_pred_fi, pnewp_precision, H_fi', h_precision); 
+    [K_fi, k_precision] = fixedMult(temp_fi_8, t8_precision, S_inv_fi, sinv_precision); 
     
     %% UPDATE EQUATIONS
-    temp_fi_9 = fixedMult(K_fi, 6, y_fi, 6); %F = 12
+    [temp_fi_9, t9_precision] = fixedMult(K_fi, k_precision, y_fi, y_precision); 
+    [x_new_fi, xnew_precision] = fixedAdd(x_new_pred_fi, xnewp_precision, temp_fi_9, t9_precision); 
+    
+    [temp_fi_10, t10_precision] = fixedMult(K_fi, inv_precision, H_fi, h_precision); 
+    [temp_fi_11, t11_precision] = fixedAdd(eye(4), 0, -temp_fi_10, t10_precision); 
+    [P_new_fi, pnew_precision] = fixedMult(temp_fi_11, t11_precision, P_new_pred_fi, pnewp_precision);
     
     %% NORMALIZE
-    temp_fi_9 = floatToFix(temp_fi_9, -6); %F = 6
-    
-    %% UPDATE EQUATIONS
-    x_new_fi = x_new_pred_fi + temp_fi_9; %F = 6
-    
-    temp_fi_10 = fixedMult(K_fi, 6, H_fi, 0); %F = 6
-    eye4_fi = floatToFix(eye(4), 6); %F = 6
-    temp_fi_11 = eye4_fi - temp_fi_10; %F = 6
-    P_new_fi = fixedMult(temp_fi_11, 6, P_new_pred_fi, 6); %F = 12
-    
-    %% NORMALIZE
-    x_new = floatToFix(x_new_fi, -6); %F = 0
-    P_new = floatToFix(P_new_fi, -12); %F = 0
+    x_new = floatToFix(x_new_fi, -xnew_precision);
+    P_new = floatToFix(P_new_fi, -pnew_precision);
 end
 
