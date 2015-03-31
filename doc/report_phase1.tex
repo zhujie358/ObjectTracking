@@ -1,0 +1,95 @@
+\documentclass[12pt]{article} %Basic document type
+\usepackage{times} %Font 
+\usepackage{amsmath} %For matrices
+\usepackage{amssymb}
+\usepackage[section]{placeins} %Allows FloatBarrier command
+\usepackage[utf8]{inputenc} %Font encoding
+\usepackage[margin=1.25in]{geometry} %Adjust margins
+\usepackage{graphicx} %Allows picture import
+\usepackage{pdfpages} %Including pdf files 
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{appendix}
+\graphicspath{{images/}} %Allows picture impor
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{The Inverted Pendulum Control Problem}
+\fancyhead[R]{ECSE 456}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{1pt}
+\renewcommand{\footrulewidth}{1.5pt}
+\newcommand{\HRule}[1][\medskipamount]{\par
+  \vspace*{\dimexpr-\parskip-\baselineskip+#1}
+  \noindent\rule{\linewidth}{0.2mm}\par
+  \vspace*{\dimexpr-\parskip-.5\baselineskip+#1}}
+\begin{document}
+\begin{titlepage}
+\begin{center}
+\textsc{\huge McGill University}\\[1.5cm]
+\textsc{\LARGE Department of Electrical \& Computer Engineering}\\[1.5cm]
+\textsc{\Large ECSE 456 - Final Report}\\[3cm]
+\HRule
+{\huge \bfseries A Real-Time Object Tracking System \\[.8cm] }
+\HRule 
+\vspace{1.5cm}
+\noindent
+\begin{minipage}{0.4\textwidth}
+\begin{flushleft} \large
+\emph{\Large Authors:}\\
+Benjamin \textsc{Brown} \\
+\textit{benjamin.brown2@mail.mcgill.ca} \\
+260450182 \\
+Taylor \textsc{Dotsikas} \\
+\textit{taylor.dotsikas@mail.mcgill.ca} \\
+260457719
+\end{flushleft}
+\begin{flushleft} \large
+\emph{\Large Supervisors:}\\
+Warren \textsc{Gross, Prof.}\\
+Arash \textsc{Ardakani} 
+\end{flushleft}
+\end{minipage}%
+\end{center}
+\end{titlepage}
+\pagebreak
+\section*{Abstract}
+\section*{Acknowledgments}
+\pagebreak
+\tableofcontents
+\pagebreak
+\section{Abbreviations \& Notation}
+\section{Introduction}
+\subsection{Motivation}
+\subsection{Applications}
+\section{Background}
+\subsection{Video Data}
+\subsection{Optical Flow}
+\subsection{Kalman Filter}
+\section{Requirements}
+\section{Design}
+\subsection{Algorithm Design}
+\subsection{Floating-Point Software}
+\subsection{Fixed-Point Software}
+\section{Future Work}
+\section{Impact on Society}
+\section{Allocation of Work}
+\section{Conclusion}
+\section{Works Cited}
+\begin{itemize}
+\item [[$\;$ 1]] 
+\item [[$\;$ 2]] 
+\item [[$\;$ 3]] 
+\item [[$\;$ 4]] 
+\item [[$\;$ 5]] 
+\item [[$\;$ 6]] 
+\item [[$\;$ 7]]  
+\item [[$\;$ 8]] 
+\item [[$\;$ 9]] 
+\item [[$\;$ 10]] 
+\item [[$\;$ 11]] 
+\end{itemize}
+\newpage
+\appendix
+\appendixpage
+\section{Additional Figures} \label{sec:add}
+\end{document}
