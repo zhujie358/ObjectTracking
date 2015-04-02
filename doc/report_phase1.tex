@@ -57,9 +57,9 @@ Arash \textsc{Ardakani}
 \end{titlepage}
 \pagebreak
 \section*{Abstract}
-
+Video processing represents an extremely relevant challenge as both the demand for intelligent, aware systems and the quality of modern video technology increases. This increase in quality comes at a cost of large amounts of data being handled under strict time constraints \cite{3}. This project aimed to study how a common video processing algorithm such as object motion tracking can be accelerated using custom hardware. This report concludes on the background, design, and findings of Phase 1 of the project; where platform research, algorithm research, and software implementation was performed. It was clear that an FPGA would be the best solution for fast, low power hardware implementation and a Kalman filter based algorithm was the best solution for a predictive algorithm not prone to noise. Finally, the large amount of time the software needed to process relatively short videos proved that direct hardware implementation of the algorithm is essential for applications. 
 \section*{Acknowledgments}
-The authors would like to thank Professor Warren Gross, for undertaking the responsibility of supervising this project. We also would like to thank Arash Ardakani for all of his advice, help, and time spent meeting with us throughout the semester. Finally, we would also like to thank anyone who contributed to the wealth of online resources about object tracking that we hope to contribute to.
+The authors would like to thank Professor Warren Gross, for undertaking the responsibility of supervising this project. We would also like to thank Arash Ardakani for all of his advice, help, and time spent meeting with us throughout the semester. Finally, we would like to thank anyone who contributed to the wealth of online resources about object tracking that we hope to contribute to.
 \pagebreak
 \tableofcontents
 \pagebreak
@@ -72,7 +72,8 @@ The authors would like to thank Professor Warren Gross, for undertaking the resp
 \end{itemize}
 \section{Introduction}
 \subsection{Motivation}
-Ben
+Scene recreation and analysis is imperative in digital systems that must understand and react to events in their environment. Some typical examples of this include surveillance, robotics, and human-computer interaction. A variety of sensors can be employed for such a task including ultrasonic, radar, and passive infrared, but all of these sensors do not come close to modeling an environment as completely as a video camera. With the increase in image quality and device accessibility, the video camera seems like the obvious solution. \\\\
+However, due to the vast amount of data and system imposed processing time constraints, video processing is a challenge. For instance, the transition to a high-definition video platform produces six times more data than the previous standard-definition one \cite{3}. This project aims to study how a complex video processing algorithm such as real-time object tracking can be greatly accelerated when implemented directly in hardware. Object tracking represents an excellent example of the aforementioned challenges because it requires capturing an image of a scene, processing the image to locate the object in motion, and reconstructing said scene with emphasis placed on the motion, all in real-time.
 \subsection{Applications}
 Taylor
 \section{Background}
