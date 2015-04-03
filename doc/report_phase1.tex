@@ -100,6 +100,7 @@ i = 1, 2, ... , n.
 The first frame, $F_1$, is defined as the \textit{base frame}, and the remaining frames are defined as the \textit{current frame} for processing. If a video is $t$ seconds long, the \textit{frame rate }is defined as
 \begin{equation}
 f = \frac{t}{n}.
+\label{eq:framerate}
 \end{equation}
 In the case of a black and white image, the pixel contains a single value that represents the grayscale intensity. Similar to $F_i$, the grayscale frame also contains $n$ frames, and its elements, $Y_{ij}$, are limited between 0 and 256. However, it is an $MXN$ matrix only. It will become apparent later that conversion between RGB and grayscale is imperative for many video processing algorithms. Unsurprisingly, there are multiple ways to do this. The colorimetric conversion principle converts RGB to grayscale using the following weighted sum:
 \begin{equation}
@@ -107,15 +108,45 @@ Y_{ij} = .2126 \cdot R_{ij} + .7152 \cdot G_{i,j} + .0722 \cdot B_{i,j}.
 \end{equation}
 Finally it should be mentioned that video data can be streamed in either progressive or interlaced format. Progressive format is the standard one frame at a time while interlaced divides the frames in half into fields. Each field contains either odd or even rows of it's corresponding frame. While this does requiring processing more frames, it gives a clearer, smoother picture as there are less scene changes between frames \cite{1}. This design choice plays a larger role in Phase 2 of the project, since software implementation uses static (pre-recorded) videos.
 \subsection{Optical Flow}
--Definitions of optical flow from literature, how it can be used to find motion. \\
--Delta Frame Generation \\
--Measuring the center of the object by intersecting two lines from left/right top/bottom of that object \\
+Optical flow addresses the idea of determining apparent motion based on changes in image intensity (i.e. brightness) over space and time \cite{4}. All of the proposed differential and matching (feature-based) techniques proposed in Trucco \& Verri \cite{4} go beyond the scope of this project. The simplest of these algorithms involve derivatives of the brightness constancy equation and a least squares solution at each pixel. Not only would they be difficult to implement in both software and hardware, but they produce what is known as the motion field of the image. This is more information than what is needed for the Kalman filter algorithm that is discussed next, which requires simply knowing the $(x,y)$ coordinate of the object in each frame. \\\\
+A far simpler, less robust approach is used of locating the object in motion for each frame known as Delta Frame Generation (DFG) \cite{8}. This method makes the following assumptions about the image:
+\begin{enumerate}
+\item The object of interest is in motion.
+\item The object of interest is the only part of the scene in motion.
+\item The first frame of the sequence does not contain the object.
+\item The lighting and background of the scene does not change between frames.
+\end{enumerate}
+The delta frame is then calculated as 
+\begin{equation}
+\Delta_i = | F_i - F_1 |.
+\end{equation}
+Where $F_i$ is the current grayscale frame and $F_1$ is the base grayscale frame discussed in the previous section. Assuming the above assumptions hold, the delta frame, $\Delta$, will be non-zero for only the object. Knowing that $\Delta$ contains only the object, drawing a line from the top/bottom most points, and finding its intersection with another line from left/right most points produces the center point of the object. The mathematical background for this is as follows. By means of simple search algorithms, the top, bottom, left, and right most points are located as
+\[
+p_t = (x_1, y_1) ,
+\]
+\[
+p_b = (x_2, y_2) ,
+\]
+\[
+p_l = (x_3, y_3) ,
+\]
+\[
+p_r = (x_4, y_4) .
+\]
+Then the two lines are given as 
+\[
+l_1(t,b):
+\]
+\[
+l_2(l,r):
+\]
 \subsection{Kalman Filter}
 A Kalman filter is used to combine continuous predictions from a theoretical system model with continuous measurements from a real implementation of the same system. This is done to help reduce the effects of noise on system measurements, and can provide a prediction of the system's next state if for some reason the measurements fail or contain lots of noise. Implementation of a Kalman filter is highly intuitive for a sensor that has been characterized with testing. But for object tracking, it is much more difficult to understand as all of the Kalman filter jargon is focused around "sensors" and "measurements" that sound odd when referring to an object tracking system. \\\\
 The Kalman filter equations can be divided into two key sets: the predication equations and the update equations \cite{4}, \cite{12}.\\\\
 \textbf{Prediction Equations:}
 \begin{equation}
 \vec{x_{k+1}} = F \cdot \vec{x_k} + B \cdot \vec{u_k}
+\label{eq:firstkalman}
 \end{equation}
 \begin{equation}
 P_{k+1} = F \cdot P_k \cdot F^T + Q
@@ -138,7 +169,44 @@ K_{k+1} = P_{k+1} \cdot H^T \cdot S_{k+1}^{-1}
 \hat{P_{k+1}} = (I - K_{k+1} \cdot H) \cdot P_{k+1}
 \end{equation}
 There are a few key observations that can be immediately made about this set of equations. Note that the distinction between intermediate calculations and predication equations is one that is not usually made in descriptions of Kalman filtering like the one by Trucco \& Verri [4]. However, from an implementation perspective this distinction makes sense, as the system in which the Kalman filter is placed in (or main algorithm) is blind to these equations. Also notice that matrices and vectors without subscripts are ones that do not change each iteration, and remain constant from initialization to completion. \\\\
-While all elements in this set of equation have physical meanings and distinct characteristics, for the sake of simplicity the only once that need to be discussed in detail are the inputs, outputs, and constant variables.
+While all elements in this set of equation have physical meanings and distinct characteristics, for the sake of simplicity the only once that need to be discussed in detail are the inputs, outputs, and constant variables. The two quantities already discussed are the measurement vector $\vec{z}$ of length $m$ and the state vector $\vec{x}$ of length $n$. For this application, $m = 2$ since by methods of optical flow discussed previously we are able to get a 2D Cartesian coordinate for the object.
+\begin{equation}
+\vec{z} = \begin{bmatrix}
+x \\
+y \\
+\end{bmatrix}
+\end{equation}
+The length of the state vector depends on the model that has been chosen for the system. Two common models for object tracking applications are the constant velocity model and the constant acceleration model. The assumptions made in these models is self explanatory; $n=4$ for constant velocity and $n=6$ for constant acceleration. In this system, the constant velocity model is used.
+\begin{equation}
+ \vec{x} = \begin{bmatrix}
+x_p \\
+y_p \\
+v_x \\
+v_y
+\end{bmatrix}
+\end{equation}
+The next system dependent variable is the state transition matrix $F$ which is $nxn$. As equation ~\ref{eq:firstkalman} indicates, it describes how the theoretical, predicted behavior of the system changes with each iteration \cite{12}. For a 2D constant velocity model, this matrix is just implementing kinematic equations:
+\begin{equation}
+x_{new} = x_{old} + t * v_x
+\end{equation}
+With a similar equation existing for $y$. In matrix form this is 
+\begin{equation}
+F= \begin{bmatrix}
+1 & 0 & f & 0 \\
+0 & 1 & 0 & f \\
+0 & 0 & 1 & 0 \\
+0 & 0 & 0 & 1
+\end{bmatrix}.
+\end{equation}
+Where $f$ is the frame rate (i.e. the time step) described in equation ~\ref{eq:framerate}. Also stemming from equation ~\ref{eq:firstkalman}, the vector $\vec{u}$ describes any external inputs applied to the system between iterations. For a simple, constant velocity object tracking system, there are none. This makes the vector irrelevant as well the associated matrix $B$. Getting back to the measurements, the only constant matrix that incorporates $m$ is the measurement model $H$ \cite{4}. This is an $mxn$ matrix that relates the predicated state to the measured value. For this application, it should take the vector $x$ of length 4 and place it in the same vector space as $z$ of length 2. Thus,
+\begin{equation}
+H = \begin{bmatrix}
+1 & 0 & 0 & 0 \\
+0 & 1 & 0 & 0 
+\end{bmatrix}.
+\end{equation}
+The final two constant matrices that must be initialized prior to starting are $Q$ ($nxn$) and $R$ ($mxm$). These matrices are related to the error in the theoretical model (i.e. air resistance, friction) and the error in the measurement model (i.e. your "sensors", in this case optical flow) respectively \cite{12}. In theory, if there are vectors $\vec{w}$ and $\vec{v}$ that characterize the error in the model and measurement respectively, then $Q$ and $R$ should be diagonal matrices containing the variance of these vectors \cite{4}. \\\\
+The final, and perhaps most important, value that should be touched on is the co-variance matrix $P$ ($nxn$) which changes with each iteration. In simple terms, this matrix is a measure of how well the measurements follow the model, and thus how accurate the filter is \cite{12}. Unlike the previously discussed values, $P$ will eventually converge to certain values do to the iterative nature of the algorithm.
 \subsection{Fixed vs. Floating-Point}
 Ben
 \section{Requirements}
