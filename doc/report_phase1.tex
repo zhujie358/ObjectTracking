@@ -71,6 +71,7 @@ The authors would like to thank Professor Warren Gross, for undertaking the resp
 \item[] CPU - Central Processing Unit
 \item[] DFG - Delta Frame Generation
 \item[] VGA - Video Graphics Array
+\item[] I/O - Input/Output
 \end{itemize}
 \section{Introduction}
 \subsection{Motivation}
@@ -275,14 +276,23 @@ All other algorithm based requirements have been met at this point in developmen
 \section{Design}
 \subsection{Platform}
 During the beginning of the project, rapid research was performed in order to determine what the best embedded hardware solution would be to implement the object tracking algorithm on. This design choice needed to incorporate findings from similar projects in order to avoid common failures, as well as factors specific to this project. \\\\
-The main embedded hardware solutions seen today for applications that required dedicated computing are microprocessors, ASICs, and FPGAs. An FPGA surpasses these other two solutions in a number of ways for video processing  solutions \cite{1}:
+The main embedded hardware solutions seen today for applications that required dedicated computing are microprocessors, ASICs, and FPGAs. Prior to weighing the best solutions, it is useful to identity the challenges that come with video processing in real-time. Challenges that are paramount in embedded video processing are algorithm complexity, timing requirements, and the need for high processing power (fast clock cycles) \cite{2}.  An FPGA surpasses microprocessors and ASICs in a number of ways for video processing  solutions \cite{1}, \cite{2}:
 \begin{itemize}
-\item Configuration after release for bug fixes and hardware modifications.
+\item Full control over the internal workings of the FPGA allows for a parallel architecture unlike microprocessors.
+\item Configuration after completion allows for bug fixes and hardware modifications.
 \item Internal logic of microprocessors is not custom, and thus not application specific.
 \item ASIC development cost is extremely high.
 \item Video signals have moved to digital formats (some exceptions such as VGA), making programmable logic solutions more relevant.
 \end{itemize}
-Starting with research of similar projects, Roth \cite{1} chose to use an FPGA from the Altera Cyclcone family for a real-time video application over Lattice of Xilinx due to the fact that Lattice had poor online support an Altera was lower cost than Xilinx. 
+In addition to these findings, an Altera White Paper \cite{3} on video processing describes the ideal architecture video processing hardware should have as high performance, flexible, easy to upgrade, and low priced to develop. From these past projects and studies it is clear that the best hardware solution for algorithm implementation is an FPGA. \\
+The next key topic for research was choosing the specific FPGA manufacturer to use. Choosing the right manufacturer is important because the quality of the tools, resources, and support they provide will have a major impact on the ease of development. Starting with the research of similar projects, Roth \cite{1} chose to use an FPGA from the Altera Cyclone family for a real-time video application over Lattice of Xilinx due to the fact that Lattice had poor online support an Altera was lower cost than Xilinx. It was also found that Altera Quartus II was superior to Xilinx ISE Design Suite because it encapsulated the optimization and configuration process into one piece of software (i.e. Quartus II can perfrom compile, simulation, and programming) \cite{1}. In a similar project, Saeed et al. \cite{2} took advantage of the Altera DE2 breakout board by using it's on-board composite video input port as well as the video decoder module. \\\\
+Based on these two projects, it was very convincing that Altera should be the manufacturer of choice. However as mentioned before, it is equally important to account for the requirements of this project specifically when choosing the platform for development. Independent of \cite{1}, \cite{2}, and \cite{3}, an Altera breakout board such as the DE1 or DE2 seemed to be the best solution for multiple reasons. \\\\
+\textbf{Familiarity:} Both members of this project have experience using Altera Quartus II with VHDL on a Cyclone FPGA. Using familiar hardware and development tools will make implementation in Phase 2 easier. \\\\
+\textbf{Avoiding Fabrication:} Due to the constraints on time and money in this project, it will be best to avoid having to fabricate a custom breakout board for the chosen FPGA and any necessary I/O or peripherals. Due to this, the major manufacturers such as Altera, Xilinx, and Lattice should be assessed on their breakout boards, and not just their FPGAs.\\\\
+\textbf{Cost:} This project has no funding, and the hardware platform will not be expanded past a single working prototype for this project. Due to this, a low-cost (ideally free), educational development board is the ideal solution. McGill has Altera DE1 and DE2 boards that may be available for use during Phase 2 of this project. If not, the price of the Altera DE1 board is only \$127 for academic use (\$150 commercial) and the DE2 board is only \$284 for academic (\$495 commercial) as well. Investigating comparable solutions by Xilinx for video and image processing applications found the Spartan-6 FPGA Embedded Kit which costs \$695.
+\\\\
+\textbf{Peripherals:} In order to give the system real-time video capabilities, the breakout board would ideally have some hardware for video decoding and display generation. This is not a necessity, as the live video input feed could be streamed digitally from a computer using  a serial connection like USB. The live video output feed could be streamed back to the computer to be displayed. The scenario just described would use the FPGA only for processing, making the full system require a CPU. However, if the entire system was to entirely autonomous from a laptop of other CPU, the breakout board would need to be able to handle incoming video data (analog or digital) and then drive a display. Examining the schematics of the Altera DE1 and DE2 boards in Figures ~\ref{fig:de1} and ~\ref{fig:de2} located in Appendix ~\ref{sec:add} shows that the DE2 is capable of being a fully functional system because of the 10-bit high speed video DAC (ADV7123) between the FPGA and VGA output port while the DE1 board only has a 4-bit RGB block that is speculated to not provide the needed output picture. It should also be noted that the DE2 board has a video decoder block (ADV7181) placed between the composite video (analog) input port and the FPGA while the DE1 does not.\\\\ 
+In summary, it was decided based on the research of similar projects, as well as taking into account certain project specific parameters like cost, time, and familiarity that an Altera DE1 or DE2 board would be the best FPGA breakout board solution. The DE2 board comes equipped with peripherals and I/O that are speculated to make it a fully featured system if analog video input is used,. However a fully featured system not a requirement, as the goal of this project is to implement just the algorithm in hardware.
 \subsection{Algorithm}
 Discuss the merits of the algorithms we researched and why we chose DFG with a Kalman filter.
 \subsection{Software}
@@ -335,4 +345,16 @@ D. Kohanbash. (2014, January 30). \textit{Kalman Filtering - A Practical Impleme
 \appendix
 \appendixpage
 \section{Additional Figures} \label{sec:add}
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.75\textwidth]{./images/DE1_schem.jpg}
+\caption{Altera DE1 Schematic (Partial)}
+\label{fig:de1}    
+\end{figure}
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.75\textwidth]{./images/DE2_schem.jpg}
+\caption{Altera DE2 Schematic (Partial)}
+\label{fig:de2}    
+\end{figure}
 \end{document}
