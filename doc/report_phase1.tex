@@ -10,6 +10,7 @@
 \usepackage{setspace}
 \usepackage{fancyhdr}
 \usepackage{appendix}
+\usepackage{mcode}
 \graphicspath{{images/}} %Allows picture impor
 \pagestyle{fancy}
 \fancyhf{}
@@ -69,6 +70,7 @@ The authors would like to thank Professor Warren Gross, for undertaking the resp
 \item[] ASIC - Application Specific Integrated Circuit
 \item[] CPU - Central Processing Unit
 \item[] DFG - Delta Frame Generation
+\item[] VGA - Video Graphics Array
 \end{itemize}
 \section{Introduction}
 \subsection{Motivation}
@@ -78,7 +80,7 @@ However, due to the vast amount of data and system imposed processing time const
 The device generates object localization data that can be used by other systems. Systems that require responsive and accurate data for real time use can are the main applications. These secondary systems can now react to moving objects in the selected environment. \\\\
 Specifically our algorithm tracks a single object from a camera that watches a stationary environment. This makes our design ideal for tracking a disturbance in the field of view. For example, the addition of our device to a camera surveillance system would provide data about where and when disturbances take place. This information could be used to quickly react to disturbances such as a trespassers on private property.\\\\
 Dedicated hardware allows for simpler connectivity to secondary systems. It presents a modular design which is ideal for testing purposes and debugging. If object tracking needs to be performed on higher definition video, dedicated hardware has its own memory which can be specifically allocated for handling larger image frames. Performance depends on the technical specifications of the hardware being used. Our current hardware is limited due to our budget, however it would be possible to upgrade the hardware to match the needs of the desired application. \\\\
-The kalman filter in our design tracks the object more smoothly and can also guess the location of the object if it disappears from the view temporarily. This further enhances the performance of secondary systems by providing them with more accurate and useful object tracking data, which is the main goal of the device.
+The Kalman filter in our design tracks the object more smoothly and can also guess the location of the object if it disappears from the view temporarily. This further enhances the performance of secondary systems by providing them with more accurate and useful object tracking data, which is the main goal of the device.
 \section{Background}
 \subsection{Video Processing}
 The most fundamental way of understanding video data is to consider it as a collection (static) or stream (real-time) of discrete images called frames. A frame is an $MxN$ matrix of pixels. Each pixel is the smallest, discrete element of the image, and store intensity data about the image. There are many different ways of representing intensity in a pixel. In the case of a color image, the pixel contains multiple values that describe the color space. Common representations of the color space are RGB or YCbCr \cite{1}. In both of these models, each pixel has 3 values.  Since MATLAB's \texttt{VideoReader} class uses RGB, for convenience, this color space is used for the remainder of the project. A single color RGB frame is mathematically described as an $MxNx3$ matrix with the form
@@ -138,11 +140,23 @@ p_r = (x_4, y_4) .
 \]
 Then the two lines are given as 
 \[
-l_1(t,b):
+l_1(t,b): y = m_1 x + b_1,
 \]
 \[
-l_2(l,r):
+l_2(l,r): y = m_2 x + b_2.
 \]
+The intersection of these two lines, denoted $(x^*, y^*)$ is given as
+\[
+x^* = \frac{b_1 - b_2}{m_2 - m_1} = \frac{((x_1y_2) - (y_1x_2))(x_3 - x_4) - (x_1 - x_2)((x_3y_4) - (y_3x_4))}{D},
+\]
+\[
+y^*  = \frac{m_2 b_1 - m_1 b_2}{m_2 - m_1} = \frac{((x_1y_2) - (y_1x_2))(y_3 - y_4) - (y_1 - y_2)((x_3y_4) - (y_3x_4)}{D}.
+\]
+The common denominator in both results is denoted $D$, and can be expanded as
+\[
+D = (x_1 - x_2)(y_3 - y_4) - (y_1 - y_2)(x_1 - x_2).
+\]
+When $D = 0$, the case of parallel lines occurs. In this case, the middle of the object is simply taken to be the average of the top and bottom points.
 \subsection{Kalman Filter}
 A Kalman filter is used to combine continuous predictions from a theoretical system model with continuous measurements from a real implementation of the same system. This is done to help reduce the effects of noise on system measurements, and can provide a prediction of the system's next state if for some reason the measurements fail or contain lots of noise. Implementation of a Kalman filter is highly intuitive for a sensor that has been characterized with testing. But for object tracking, it is much more difficult to understand as all of the Kalman filter jargon is focused around "sensors" and "measurements" that sound odd when referring to an object tracking system. \\\\
 The Kalman filter equations can be divided into two key sets: the predication equations and the update equations \cite{4}, \cite{12}.\\\\
@@ -211,15 +225,64 @@ H = \begin{bmatrix}
 The final two constant matrices that must be initialized prior to starting are $Q$ ($nxn$) and $R$ ($mxm$). These matrices are related to the error in the theoretical model (i.e. air resistance, friction) and the error in the measurement model (i.e. your "sensors", in this case optical flow) respectively \cite{12}. In theory, if there are vectors $\vec{w}$ and $\vec{v}$ that characterize the error in the model and measurement respectively, then $Q$ and $R$ should be diagonal matrices containing the variance of these vectors \cite{4}. \\\\
 The final, and perhaps most important, value that should be touched on is the co-variance matrix $P$ ($nxn$) which changes with each iteration. In simple terms, this matrix is a measure of how well the measurements follow the model, and thus how accurate the filter is \cite{12}. Unlike the previously discussed values, $P$ will eventually converge to certain values do to the iterative nature of the algorithm.
 \subsection{Fixed vs. Floating-Point}
-Ben
+Fractional portions of numbers can be represented in either fixed or floating-point in hardware. The essential difference between these two data representations is that in fixed-point the decimal point (i.e. dividing the integer and fractional portions) does not really exist from a hardware perspective. It is the job of the programmer to "know" where the decimal point is for each binary string, and then use the data under that interpretation. Most modern computing solutions use floating-point numbers, as it allows the user to implement real numbers without constraint. For example, by default all numbers in MATLAB are 64-bit double precision \cite{10}. A 64-bit architecture (i.e. all numbers are 64-bits long) as well as a floating-point unit take up considerable space in hardware \cite{10}, and embedded hardware solutions have limited resources and power. It is clear that floating-point data representation will not be possible for an application such as this, and fixed-point conversion of the software is necessary. \\\\
+Fixed-point conversion works by scaling all real (non-integer) numbers by a large number and then rounding to make it an integer. The idea is that if the number is scaled large enough, rounding will only remove a very small portion of the number, if any. The scale factor is generally used as a power of 2 or power of 10. Powers of 10 are much more intuitive from a programming sense, as humans use base-10, but powers of 2 are much more useful for hardware implementation, as multiplication by a power of 2 represents a shift along a binary string. The object tracking algorithm discussed in the previous sections only uses addition, subtraction, multiplication, and division operations. There is one matrix inverse operation, but since it is a $2x2$ matrix it is treated as swapping entries and dividing. When treating division operations (there are only two) as multiplication by an inverse and subtraction as addition by a negative number, the algorithm can be converted from floating-point to fixed-point by implementing the algorithms for conversion, addition, and multiplication discussed in \cite{10}. \\\\
+MATLAB implementation of the three algorithms just mentioned are shown below. Note that every fixed-point number has an associated word length $W$ and a fractional portion $F$. $W$ denotes how long the binary string used to represent the number is, and $F$ denotes the location of the decimal point from the least-significant (rightmost) bit. \\\\
+\textbf{Fixed-Point Conversion:}
+\begin{lstlisting}
+function [fixed] = floatToFix(float, F)
+
+    d = float .* 2^(F);
+    fixed = round(d);
+
+    %Verify that enough fractional bits were used to represent this number
+    if (float(1,1) ~= 0 && fixed(1,1) == 0)
+        disp('ERROR: The chosen F is too small to represent this value.');
+    end
+
+end
+\end{lstlisting}
+\textbf{Fixed-Point Addition:}
+\begin{lstlisting}
+function [result, F] = fixedAdd(fix1, F1, fix2, F2)
+
+	%Normalize
+    if(F1 > F2)
+        fix2 = fix2.* 2^(F1-F2);
+        F = F1;
+    else
+        fix1 = fix1.* 2^(F2-F1);
+        F = F2;
+    end
+
+    result = fix1 + fix2;
+
+end
+\end{lstlisting}
+\textbf{Fixed-Point Multiplication:}
+\begin{lstlisting}
+function [result, F] = fixedMult(fix1, F1, fix2, F2)
+
+    result = fix1*fix2;
+    F = F1 + F2;
+
+end
+\end{lstlisting}
+Going through the floating-point software and replacing all non-integer numbers with their converted value as well as replacing all operations with these algorithms converted the software to fixed-point. Finally, it is important to note that using these algorithms recursively or repeatedly causes the fractional portion $F$ to grow significantly. Due to architecture constraints described above, it is necessary to normalize the fixed-point numbers by "chopping" extra bits when there are too many. This is done in MATLAB by calling \texttt{floatToFix.m} with a negative fractional component, and would be done in VHDL or other hardware description languages by simply removing bits since they are accessible binary strings.
 \section{Requirements}
 Several requirements had to be met so that the device could be viable for use. We placed a strong emphasis on code efficiency in our software development. Computational time dedicated to video processing needs to be kept at a minimum so that the object tracking is done as close to real time as possible. The main goal is to have a live video feed from a camera displayed on a screen and a cursor tracking the object. This will be visual proof that the device works. If our code was inefficient or too intensive, there would be a delay between what was actually happening in front of the camera, and the output video feed that has the object located. The device would not have much use if there was a lot of lag. There will be some delay as it would be impossible to accomplish the necessary computations instantly, but it is possible to minimize the delay so that it is barely noticeable. This is why it was crucial to make sure computations are not redone if they don't need to be and unnecessary computations are removed. Every computation needs to be done in the optimal way considering we don't have accesses to more advanced hardware. These optimization challenges will be more apparent when we begin hardware implementation with VHDL. The hardware limitations of the FPGA certainly pose some constraints to our design but we should be able to obtain a good result with it. \\\\
-All other algorithm based requirements have been met at this point in development. The ability to filter out noise and locate a single object has been implemented in our Matlab code. 
-
-
+All other algorithm based requirements have been met at this point in development. The ability to filter out noise and locate a single object has been implemented in our MATLAB code. 
 \section{Design}
 \subsection{Platform}
-In this section we look to formally justify the aforementioned choice of an FPGA, and specifically an Altera FPGA, for hardware implementation in comparison to other embedded hardware choices. 
+During the beginning of the project, rapid research was performed in order to determine what the best embedded hardware solution would be to implement the object tracking algorithm on. This design choice needed to incorporate findings from similar projects in order to avoid common failures, as well as factors specific to this project. \\\\
+The main embedded hardware solutions seen today for applications that required dedicated computing are microprocessors, ASICs, and FPGAs. An FPGA surpasses these other two solutions in a number of ways for video processing  solutions \cite{1}:
+\begin{itemize}
+\item Configuration after release for bug fixes and hardware modifications.
+\item Internal logic of microprocessors is not custom, and thus not application specific.
+\item ASIC development cost is extremely high.
+\item Video signals have moved to digital formats (some exceptions such as VGA), making programmable logic solutions more relevant.
+\end{itemize}
+Starting with research of similar projects, Roth \cite{1} chose to use an FPGA from the Altera Cyclcone family for a real-time video application over Lattice of Xilinx due to the fact that Lattice had poor online support an Altera was lower cost than Xilinx. 
 \subsection{Algorithm}
 Discuss the merits of the algorithms we researched and why we chose DFG with a Kalman filter.
 \subsection{Software}
