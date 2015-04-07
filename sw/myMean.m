@@ -27,8 +27,8 @@ function [mean_fi] = myMean(frame_fi)
 
     if (numNonZeroTerms ~= 0)
         numNonZeroTermsInv = 1/numNonZeroTerms; %Floating-Point
-        numNonZeroTerms_fi = floatToFix(numNonZeroTermsInv, 14); %F = 14
-        mean_fi = fixedMult(sum_fi, 0, numNonZeroTerms_fi, 14); %F = 14
+        numNonZeroTerms_fi = floatToFix(numNonZeroTermsInv, 16); %F = 14
+        mean_fi = fixedMult(sum_fi, 0, numNonZeroTerms_fi, 16); %F = 14
     else
         mean_fi = 0;
     end
