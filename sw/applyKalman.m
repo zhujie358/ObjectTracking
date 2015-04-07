@@ -59,9 +59,9 @@ function [x_fi] = applyKalman(z_fi, t_step_fi, i)
     
     %% INTERMEDIATE CALCULATIONS
     [temp_fi_3, t3_precision] = fixedMult(H_fi, h_precision, x_new_pred_fi, xnewp_precision); 
-    [y_fi, y_precision] = fixedAdd(z_fi, z_precision, temp_fi_3, t3_precision);
+    [y_fi, y_precision] = fixedAdd(z_fi, z_precision, -temp_fi_3, t3_precision);
     
-    [temp_fi_4, t4_precision] = fixedMult(H_fi, t_precision, P_new_pred_fi, pnewp_precision); 
+    [temp_fi_4, t4_precision] = fixedMult(H_fi, h_precision, P_new_pred_fi, pnewp_precision); 
     [temp_fi_5, t5_precision] = fixedMult(temp_fi_4, t4_precision, H_fi', h_precision);
     [S_fi, s_precision] = fixedAdd(temp_fi_5, t5_precision, R_fi, r_precision); 
     
