@@ -14,15 +14,8 @@ function [fixed] = floatToFix(float, F)
     fixed = round(d);
 
     %Verify that enough fractional bits were used to represent this number
-    while (float(1,1) ~= 0 && fixed(1,1) == 0)
-        %disp('ERROR: The chosen F is too small to represent this value.');
-        old_F = F;
-        F = F+1;
-        new_F = F;
-        d = float .* 2^(F);
-        fixed = round(d);
-        str = sprintf('Old F: %d ------ New F: %d', old_F, new_F);
-        disp(str);
+    if (float(1,1) ~= 0 && fixed(1,1) == 0 && F > 0)
+        disp('ERROR: The chosen F is too small to represent this value.');
     end
 
 end

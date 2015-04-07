@@ -15,18 +15,22 @@
 % @retval P_new: 4x4 covariance matrix containing Kalman confidence from the
 % current iteration (k)
 
-function [x_new, P_new] = applyKalman(z_fi, x_old_fi, P_old_fi, t_step_fi)
+function [x_fi] = applyKalman(z_fi, t_step_fi, i)
     %% INPUT FIXED-POINT INFO
     %z_fi --> F = 0
-    %x_old_fi --> F = 2
-    %P_old_fi --> F = 0
     %t_step_fi --> F = 6
+    
+    persistent x_p P_p x_precision p_precision
+    if (i == 2)
+        x_p = [0, 0, 0, 0]';
+        P_p = eye(4);
+        x_precision = 0;
+        p_precision = 0;
+    end
     
     %% FIXED-POINT CONSTANTS
     inv_precision = 32;
     z_precision = 0;
-    x_precision = 2;
-    p_precision = 0;
     t_precision = 6;
     h_precision = 0;
     q_precision = 0; 
@@ -47,9 +51,9 @@ function [x_new, P_new] = applyKalman(z_fi, x_old_fi, P_old_fi, t_step_fi)
     R_fi = floatToFix(R, r_precision);
 
     %% PREDICTION EQUATIONS
-    [x_new_pred_fi, xnewp_precision] = fixedMult(F_fi, f_precision, x_old_fi, x_precision);
+    [x_new_pred_fi, xnewp_precision] = fixedMult(F_fi, f_precision, x_p, x_precision);
     
-    [temp_fi_1, t1_precision] = fixedMult(F_fi, f_precision, P_old_fi, p_precision);
+    [temp_fi_1, t1_precision] = fixedMult(F_fi, f_precision, P_p, p_precision);
     [temp_fi_2, t2_precision] = fixedMult(temp_fi_1, t1_precision, F_fi', f_precision); 
     [P_new_pred_fi, pnewp_precision] = fixedAdd(temp_fi_2, t2_precision, Q_fi, q_precision);
     
@@ -81,14 +85,13 @@ function [x_new, P_new] = applyKalman(z_fi, x_old_fi, P_old_fi, t_step_fi)
     
     %% UPDATE EQUATIONS
     [temp_fi_9, t9_precision] = fixedMult(K_fi, k_precision, y_fi, y_precision); 
-    [x_new_fi, xnew_precision] = fixedAdd(x_new_pred_fi, xnewp_precision, temp_fi_9, t9_precision); 
+    [x_p, x_precision] = fixedAdd(x_new_pred_fi, xnewp_precision, temp_fi_9, t9_precision); 
     
-    [temp_fi_10, t10_precision] = fixedMult(K_fi, inv_precision, H_fi, h_precision); 
+    [temp_fi_10, t10_precision] = fixedMult(K_fi, k_precision, H_fi, h_precision); 
     [temp_fi_11, t11_precision] = fixedAdd(eye(4), 0, -temp_fi_10, t10_precision); 
-    [P_new_fi, pnew_precision] = fixedMult(temp_fi_11, t11_precision, P_new_pred_fi, pnewp_precision);
+    [P_p, p_precision] = fixedMult(temp_fi_11, t11_precision, P_new_pred_fi, pnewp_precision);
     
     %% NORMALIZE
-    x_new = floatToFix(x_new_fi, -xnew_precision);
-    P_new = floatToFix(P_new_fi, -pnew_precision);
+    x_fi = floatToFix(x_p, -x_precision);
 end
 

@@ -15,5 +15,11 @@ function [result, F] = fixedMult(fix1, F1, fix2, F2)
 
     result = fix1*fix2;
     F = F1 + F2;
-
+    
+    X = 20;
+    if (F > X)
+      norm = F - X;
+      result = floatToFix(result, -norm);
+      F = X;
+    end
 end

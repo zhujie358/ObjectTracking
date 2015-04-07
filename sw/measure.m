@@ -106,7 +106,7 @@ function [z_fi] = measure(edges_fi)
         x_fi = (x1 + x2)*oneHalf_fi; %F = 2
         y_fi = (y1 + y2)*oneHalf_fi; %F = 2
     else
-        F = 17;
+        F = 20;
         x_temp = (((x1*y2) - (y1*x2))*(x3 - x4) - (x1 - x2)*((x3*y4) - (y3*x4))); %F = 0
         y_temp = (((x1*y2) - (y1*x2))*(y3 - y4) - (y1 - y2)*((x3*y4) - (y3*x4))); %F = 0
         invDenom_fi = floatToFix((1/denom), F); %F = 17
