@@ -56,8 +56,7 @@ for i = 2 : numFrames
 	delta_fi = deltaFrame(GS_CURR_fi, GS_BASE_fi, THRESH_fi); %F = 0
     
     %Use edge detection to apply a median filter and reduce noise
-    %filteredDelta_fi = medianFilter(delta_fi, THRESH_fi); %F = 0
-    filteredDelta_fi = medfilt2(delta_fi);
+    filteredDelta_fi = medianFilter(delta_fi, THRESH_fi); %F = 0
     
     %Based on the delta frame, detemine its (x,y) position
     z_fi = measure(filteredDelta_fi); %F = 0
