@@ -3,15 +3,10 @@
 % @author Benjamin Brown (bbrown1867@gmail.com)
 % @author Taylor Dotsikas (taylor.dotsikas@mail.mcgill.ca)
 % @date February 20th, 2015
-% @brief Function to apply Kalman filter equations for improved position
+% @brief Function to apply Kalman filter equations for improved position.
 % @param z_fi: 2x1 measurment vector containing (x,y) position
-% @param x_old_fi: 4x1 state vector containing (x,y) position and velocity
-% from the previous iteration (k-1)
-% @param P_old_fi: 4x4 covariance matrix containing Kalman confidence from the
-% previous iteration (k-1)
 % @param t_step_fi: A value containing the time between measurements
-% @retval x_new: 4x1 state vector containing (x,y) position and velocity
-% from the current iteration (k)
+% @param i: The current iteration in the frame loop, used to initialize values
 % @retval P_new: 4x4 covariance matrix containing Kalman confidence from the
 % current iteration (k)
 

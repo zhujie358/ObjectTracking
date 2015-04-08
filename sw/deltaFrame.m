@@ -6,8 +6,7 @@
 % @brief Function to compute and filter the delta fame.
 % @param curr_fi: MxN current frame
 % @param base_fi: MxN base frame
-% @param INIT_THRESH_fi: Threshold from previous iteration
-% @retval NEW_THRESH_fi: Threshold from current iteration
+% @param THRESH_fi: Threshold for filtering
 % @retval delta_fi: MxN delta frame
 
 function [delta_fi] = deltaFrame(curr_fi, base_fi, THRESH_fi)
