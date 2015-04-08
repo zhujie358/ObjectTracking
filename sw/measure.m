@@ -12,6 +12,8 @@ function [z_fi] = measure(edges_fi)
     %% INPUT FIXED-POINT INFO
     % edges_fi --> F = 0
 
+    global divisorF;
+    
     %% ALGORITHM
     %Assume 1 object in frame
     %Find the 4 points that represent the outermost points of the object
@@ -106,7 +108,7 @@ function [z_fi] = measure(edges_fi)
         x_fi = (x1 + x2)*oneHalf_fi; %F = 2
         y_fi = (y1 + y2)*oneHalf_fi; %F = 2
     else
-        F = 20;
+        F = divisorF;
         x_temp = (((x1*y2) - (y1*x2))*(x3 - x4) - (x1 - x2)*((x3*y4) - (y3*x4))); %F = 0
         y_temp = (((x1*y2) - (y1*x2))*(y3 - y4) - (y1 - y2)*((x3*y4) - (y3*x4))); %F = 0
         invDenom_fi = floatToFix((1/denom), F); %F = 17

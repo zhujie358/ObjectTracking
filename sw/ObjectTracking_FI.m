@@ -11,6 +11,12 @@ vidObj = VideoReader('sample_input_1.mp4');
 vidObj2 = VideoWriter('./ECSE 456/ObjectTracking/sw/sample_output_1');
 open(vidObj2);
 
+%% FIXED-POINT ARCHITECTURE
+global divisorF;
+global archW;
+archW = 31;
+divisorF = 20;
+
 %% INITIALIZE VIDEO CONSTANTS (FLOATING-POINT)
 numFrames = vidObj.NumberOfFrames;
 numRows = vidObj.Height;
@@ -50,19 +56,20 @@ for i = 2 : numFrames
 	delta_fi = deltaFrame(GS_CURR_fi, GS_BASE_fi, THRESH_fi); %F = 0
     
     %Use edge detection to apply a median filter and reduce noise
-    filteredDelta_fi = medianFilter(delta_fi, THRESH_fi); %F = 0
+    %filteredDelta_fi = medianFilter(delta_fi, THRESH_fi); %F = 0
+    filteredDelta_fi = medfilt2(delta_fi);
     
     %Based on the delta frame, detemine its (x,y) position
     z_fi = measure(filteredDelta_fi); %F = 0
       
     %Perform a Kalman filter iteration based on this measurement
-    %x_fi = applyKalman(z_fi, t_step_fi, i); %F = 0
+    x_fi = applyKalman(z_fi, t_step_fi, i); %F = 0
     
     %NO FLOATING-POINT OPERATIONS AFTER THIS POINT
     
     %Draw a red box dot at the post-Kalman filtered position
-    x = fix(z_fi(1));
-    y = fix(z_fi(2));
+    x = fix(x_fi(1));
+    y = fix(x_fi(2));
     if (x <= 0)
         x = 1;
     elseif (x > numCols)

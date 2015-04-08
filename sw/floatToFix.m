@@ -10,6 +10,8 @@
 
 function [fixed] = floatToFix(float, F)
 
+    global archW;
+    
     d = float .* 2^(F);
     fixed = round(d);
 
@@ -18,4 +20,9 @@ function [fixed] = floatToFix(float, F)
         disp('ERROR: The chosen F is too small to represent this value.');
     end
 
+    %Verify that the value is not too large for the desired architecture
+    binaryString = length(dec2bin(abs(fixed(1,1))));
+    if (binaryString > archW)
+        disp('ERROR: Value larger than desired architecture.');
+    end
 end

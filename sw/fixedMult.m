@@ -13,13 +13,24 @@
 
 function [result, F] = fixedMult(fix1, F1, fix2, F2)
 
+    global divisorF;
+    global archW;
+
     result = fix1*fix2;
     F = F1 + F2;
     
-    X = 20;
+    %Normalize any values that need more than the max fractional bits
+    X = divisorF;
     if (F > X)
       norm = F - X;
       result = floatToFix(result, -norm);
       F = X;
     end
+   
+    %Verify that the value is not too large for the desired architecture
+    binaryString = length(dec2bin(abs(result(1,1))));
+    if (binaryString > archW)
+        disp('ERROR: Value larger than desired architecture.');
+    end
+    
 end

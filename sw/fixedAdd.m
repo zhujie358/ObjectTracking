@@ -13,6 +13,8 @@
 
 function [result, F] = fixedAdd(fix1, F1, fix2, F2)
 
+    global archW;
+    
     if(F1 > F2)
         fix2 = fix2.* 2^(F1-F2);
         F = F1;
@@ -23,4 +25,10 @@ function [result, F] = fixedAdd(fix1, F1, fix2, F2)
 
     result = fix1 + fix2;
 
+    %Verify that the value is not too large for the desired architecture
+    binaryString = length(dec2bin(abs(result(1,1))));
+    if (binaryString > archW)
+        disp('ERROR: Value larger than desired architecture.');
+    end   
+    
 end

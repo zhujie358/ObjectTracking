@@ -20,6 +20,8 @@ function [x_fi] = applyKalman(z_fi, t_step_fi, i)
     %z_fi --> F = 0
     %t_step_fi --> F = 6
     
+    global divisorF;
+    
     persistent x_p P_p x_precision p_precision
     if (i == 2)
         x_p = [0, 0, 0, 0]';
@@ -29,7 +31,7 @@ function [x_fi] = applyKalman(z_fi, t_step_fi, i)
     end
     
     %% FIXED-POINT CONSTANTS
-    inv_precision = 32;
+    inv_precision = divisorF;
     z_precision = 0;
     t_precision = 6;
     h_precision = 0;
@@ -64,6 +66,10 @@ function [x_fi] = applyKalman(z_fi, t_step_fi, i)
     [temp_fi_4, t4_precision] = fixedMult(H_fi, h_precision, P_new_pred_fi, pnewp_precision); 
     [temp_fi_5, t5_precision] = fixedMult(temp_fi_4, t4_precision, H_fi', h_precision);
     [S_fi, s_precision] = fixedAdd(temp_fi_5, t5_precision, R_fi, r_precision); 
+    
+    %% NORMALIZE
+    S_fi = floatToFix(S_fi, -s_precision);
+    s_precision = 0;
     
     %% INVERT S
     [temp_fi_6, t6_precision] = fixedMult(S_fi(1), s_precision, S_fi(4), s_precision); 
