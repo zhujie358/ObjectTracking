@@ -75,8 +75,9 @@ The authors would like to thank Professor Warren Gross, for undertaking the resp
 \item[] VLSI - Very Large Scale Integration
 \end{itemize}
 \section{Introduction}
+\label{sec:intro}
 \subsection{Motivation}
-Scene recreation and analysis is imperative in digital systems that must understand and react to events in their environment. Some typical examples of this include surveillance, robotics, and human-computer interaction. A variety of sensors can be employed for such a task including ultrasonic, radar, and passive infrared, but all of these sensors do not come close to modeling an environment as completely as a video camera. With the increase in image quality and device accessibility, the video camera seems like the obvious solution. \\\\
+The goal of this project is to develop a system that can perform real-time motion based object tracking. This is motivated by the fact that scene recreation and analysis is imperative in digital systems that must understand and react to events in their environment. Some typical examples of this include surveillance, robotics, and human-computer interaction. A variety of sensors can be employed for such a task including ultrasonic, radar, and passive infrared, but all of these sensors do not come close to modeling an environment as completely as a video camera. With the increase in image quality and device accessibility, the video camera seems like the obvious solution. \\\\
 However, due to the vast amount of data and system imposed processing time constraints, video processing is a challenge. For instance, the transition to a high-definition video platform produces six times more data than the previous standard-definition one \cite{3}. This project aims to study how a complex video processing algorithm such as real-time object tracking can be greatly accelerated when implemented directly in hardware. Object tracking represents an excellent example of the preceding challenges because it requires capturing an image of a scene, processing the image to locate the object in motion, and reconstructing said scene with emphasis placed on the motion, all in real-time.
 \subsection{Applications}
 The finished system will generate object localization data that can be used by other systems. Systems that require responsive and accurate data for real-time use are the main applications. These secondary systems can now react to moving objects in the selected environment. \\\\
@@ -84,6 +85,7 @@ Specifically, the algorithm implemented in the system tracks a single object fro
 Dedicated hardware allows for simpler connectivity to secondary systems. It presents a modular design which is ideal for testing purposes and debugging. If object tracking needs to be performed on higher definition video, dedicated hardware has its own memory which can be specifically allocated for handling larger image frames. Performance depends on the technical specifications of the hardware being used. The current hardware is limited due to budget constraints, however it would be possible to upgrade the hardware to match the needs of the desired application. \\\\
 The Kalman filter in the design tracks the object more smoothly and can also predict the location of the object if it disappears from the view temporarily. This further enhances the performance of secondary systems by providing them with more accurate and useful object tracking data, which is the main goal of the device.
 \section{Background}
+\label{sec:back}
 \subsection{Video Processing}
 \label{sec:vp}
 The most fundamental way of understanding video data is to consider it as a collection (static) or stream (real-time) of discrete images called frames. A frame is an $MxN$ matrix of pixels. Each pixel is the smallest discrete element of the image, and store intensity data about the image. There are many different ways of representing intensity in a pixel. In the case of a color image, the pixel contains multiple values that describe the color space. Common representations of the color space are RGB or YCbCr \cite{1}. In both of these models, each pixel has 3 values.  Since MATLAB's \texttt{VideoReader} class uses RGB, for convenience, this color space is used for the remainder of the project. A single color RGB frame is mathematically described as an $MxNx3$ matrix with the form
@@ -233,26 +235,34 @@ The final, and perhaps most important, value that should be touched on is the co
 \label{sec:fp}
 Fractional portions of numbers can be represented in either fixed or floating-point in hardware. The essential difference between these two data representations is that in fixed-point the decimal point (i.e. dividing the integer and fractional portions) does not really exist from a hardware perspective. It is the job of the programmer to know where the decimal point is for each binary string, and then use the data under that interpretation. Most modern computing solutions use floating-point numbers, as it allows the user to implement real numbers without constraint. For example, by default all numbers in MATLAB are 64-bit double precision \cite{10}. A 64-bit architecture (i.e. all numbers are 64-bits long) as well as a floating-point unit take up considerable space in hardware \cite{10}, and embedded hardware solutions have limited resources and power. It is clear that floating-point data representation will not be possible for an application such as this, and fixed-point conversion of the software is necessary. \\\\
 Fixed-point conversion works by scaling all real (non-integer) numbers by a large number and then rounding to make it an integer. The idea is that if the number is scaled large enough, rounding will only remove a very small portion of the number, if any. The scale factor is generally used as a power of 2 or power of 10. Powers of 10 are much more intuitive from a programming sense, as humans use base-10, but powers of 2 are much more useful for hardware implementation, as multiplication by a power of 2 represents a shift along a binary string. The object tracking algorithm discussed in the previous sections only uses addition, subtraction, multiplication, and division operations. There is one matrix inverse operation, but since it is a $2x2$ matrix it is treated as swapping entries and dividing. When all division operations (there are only two) are treated as multiplication by an inverse and subtraction as addition by a negative number, the algorithm can be converted from floating-point to fixed-point by implementing the algorithms for conversion, addition, and multiplication discussed in \cite{10}. \\\\
-MATLAB implementation of the three algorithms just mentioned are shown below. Note that every fixed-point number has an associated word length $W$ and a fractional portion $F$. $W$ denotes how long the binary string used to represent the number is, and $F$ denotes the location of the decimal point from the least-significant (rightmost) bit. \\\\
+MATLAB implementation of the three algorithms just mentioned are shown below. Note that every fixed-point number has an associated word length $W$ and a fractional portion $F$. $W$ denotes how long the binary string used to represent the number is, and $F$ denotes the location of the decimal point from the least-significant (rightmost) bit. These two values are measured in number of bits.\\\\
 \textbf{Fixed-Point Conversion:}
 \begin{lstlisting}
 function [fixed] = floatToFix(float, F)
 
+    global archW;
+    
     d = float .* 2^(F);
     fixed = round(d);
 
     %Verify that enough fractional bits were used to represent this number
-    if (float(1,1) ~= 0 && fixed(1,1) == 0)
+    if (float(1,1) ~= 0 && fixed(1,1) == 0 && F > 0)
         disp('ERROR: The chosen F is too small to represent this value.');
     end
 
+    %Verify that the value is not too large for the desired architecture
+    binaryString = length(dec2bin(abs(fixed(1,1))));
+    if (binaryString > archW)
+        disp('ERROR: Value larger than desired architecture.');
+    end
 end
 \end{lstlisting}
 \textbf{Fixed-Point Addition:}
 \begin{lstlisting}
 function [result, F] = fixedAdd(fix1, F1, fix2, F2)
 
-	%Normalize
+    global archW;
+    
     if(F1 > F2)
         fix2 = fix2.* 2^(F1-F2);
         F = F1;
@@ -263,21 +273,55 @@ function [result, F] = fixedAdd(fix1, F1, fix2, F2)
 
     result = fix1 + fix2;
 
+    %Verify that the value is not too large for the desired architecture
+    binaryString = length(dec2bin(abs(result(1,1))));
+    if (binaryString > archW)
+        disp('ERROR: Value larger than desired architecture.');
+    end   
+    
 end
 \end{lstlisting}
 \textbf{Fixed-Point Multiplication:}
 \begin{lstlisting}
 function [result, F] = fixedMult(fix1, F1, fix2, F2)
 
+    global divisorF;
+    global archW;
+
     result = fix1*fix2;
     F = F1 + F2;
-
+    
+    %Normalize any values that need more than the max fractional bits
+    X = divisorF;
+    if (F > X)
+      norm = F - X;
+      result = floatToFix(result, -norm);
+      F = X;
+    end
+   
+    %Verify that the value is not too large for the desired architecture
+    binaryString = length(dec2bin(abs(result(1,1))));
+    if (binaryString > archW)
+        disp('ERROR: Value larger than desired architecture.');
+    end
+    
 end
 \end{lstlisting}
 Going through the floating-point software and replacing all non-integer numbers with their converted value as well as replacing all operations with these algorithms converted the software to fixed-point. Finally, it is important to note that using these algorithms recursively or repeatedly causes the fractional portion $F$ to grow significantly. Due to architecture constraints described above, it is necessary to normalize the fixed-point numbers by "chopping" extra bits when there are too many. This is done in MATLAB by calling \texttt{floatToFix.m} with a negative fractional component, and would be done in VHDL or other hardware description languages by simply removing bits since they are accessible binary strings.
 \section{Requirements}
-Several requirements had to be met so that the device could be viable for use. A strong emphasis was placed on code efficiency in software development. Computational time dedicated to video processing needs to be kept at a minimum so that the object tracking is done as close to real-time as possible. The main goal is to have a live video feed from a camera displayed on a screen and a cursor tracking the object. This will be visual proof that the device works. If the code was inefficient or too intensive, there would be a delay between what was actually happening in front of the camera, and the output video feed that has the object located. The device would not have much use if there was a lot of lag. There will be some delay as it would be impossible to accomplish the necessary computations instantly, but it is possible to minimize the delay so that it is barely noticeable. This is why it was crucial to make sure computations are not redone if they don't need to be and unnecessary computations are removed. Every computation needs to be done in the optimal way considering there is not access to more advanced hardware. These optimization challenges will be more apparent when hardware implementation begins. Hardware limitations also pose a constraint on the design, but preliminary hardware research showed that there should be no issues implementing this algorithm on the chosen platform. \\\\
-All algorithm based requirements have been met at this point in development. The ability to filter out noise and locate a single object has been implemented in the MATLAB code. 
+Derived from the background research performed in section ~\ref{sec:back} and the purview of the project discussed in section ~\ref{sec:intro}, the completed system shall meet the following requirements.
+\subsection{Time Frame}
+The project shall be completed by December 2015. The project will be broken into two phases. Phase 1 of the project will be January - April 2015, and Phase 2 of the project will be September - December 2015.
+\subsection{Algorithm}
+An algorithm shall be chosen such that the system is capable of tracking an object that is in motion, in real-time. The algorithm will be simple enough such that it can be implemented in hardware within the project's duration and within the scope of the author's skills. To ensure this, the chosen algorithm will contain basic operations in order to ease hardware implementation. The algorithm will be chosen during Phase 1 of the project.
+\subsection{Software}
+Software implementation of the algorithm shall be performed during Phase 1 of the project to act as a proof of concept for the algorithm, and to understand the strengths and weaknesses of the algorithm. Software implementation shall be performed in MATLAB. Upon completion, the software will be able to track an object in motion with a clear and visible cursor, for an input video that satisfies all assumptions and prerequisite conditions the algorithm may have. 
+\subsubsection{Floating-Point}
+The first iteration of the software implementation shall be in floating-point to provide a high-level structure of the algorithm. The software shall not have any dependencies on MATLAB (i.e. use built in functions) with the exception of simple helper functions such as \texttt{eye}, \texttt{zeros}, \texttt{round}, and \texttt{fix}. MATLAB's \texttt{VideoReader} and \texttt{VideoWriter} class may be used for I/O.
+\subsubsection{Fixed-Point}
+The second iteration of the software implementation shall be in fixed-point to make hardware implementation easier and more efficient. No values in the fixed-point software shall have fractional portions (e.g. reals, floats, or doubles) with the exception of constants declared directly before conversion and preparing data for MATLAB's \texttt{VideoWriter} class as output.
+\subsection{Hardware}
+Hardware implementation of the algorithm shall be performed during Phase 2 of the project. The completed hardware implementation of the algorithm shall be the final system. The system will contain embedded hardware which the algorithm has been implemented on. The system will include a video camera providing a live feed of the chosen scene. Upon completion, the system will be able to track an object in motion in real-time and identify the object in motion on a display with a clear and visible cursor. All components of the system shall be as low priced as possible.
 \section{Design}
 \subsection{Platform}
 \label{sec:platform}
@@ -351,7 +395,33 @@ Trial \# & Implementation & Execution Time (s) & Results \\ \hline
 \FloatBarrier
 \noindent
 From these results, it was clear that a median filter would be necessary due to the improved results. It was also clear that there was good motive for implementing this algorithm in hardware, as the run-time for a 20 second input video was very long as seen from trial \#4 in Table ~\ref{table:x} when all of our functions were used. \\\\
-The next step in software development was converting the stable floating-point code to fixed-point. This process was described in section ~\ref{sec:fp}, and the converted main script is located in the file \texttt{ObjectTracking\_FI.m}. The helper functions used in fixed-point conversion are \texttt{floatToFix.m}, \texttt{fixedMult.m}, and \texttt{fixedAdd.m} are also presented in section ~\ref{sec:fp}. The two main challenges faced here was the need for a large architecture due to division operations, and converting the Kalman filter. Regarding the first issue, it was desired to have a small word length $W$ such as 16-bits in order to decrease hardware complexity. The initial design hoped to use 10-bits for integer portion as the largest number in the floating-point code was 1000, and then use the remaining 6-bits for the fractional portion. It was quickly seen that this would not not work, as the two division operations (approached by doing multiplication of the inverse) produced extremely small numbers that required at least 17-bits for a fractional portion. Due to this, a large architecture such as 32-bits will be needed for hardware implementation. The other challenge was converting the Kalman filter to fixed-point, which has currently not been resolved. The fixed-point values in \texttt{applyKalman.m} appear to grow with each iteration, and make object's position converge to zero. Aside to this one function, the fixed-point conversion was completed without any issues assuming at least 17-bits can be allocated to the fractional portion of the number representation.
+The next step in software development was converting the stable floating-point code to fixed-point. This process was described in section ~\ref{sec:fp}, and the converted main script is located in the file \texttt{ObjectTracking\_FI.m}. The helper functions used in fixed-point conversion \texttt{floatToFix.m}, \texttt{fixedMult.m}, and \texttt{fixedAdd.m} are also presented in section ~\ref{sec:fp}. It was important to perform constant error checking and normalization during this process. All numbers that are converted from floating-point to fixed-point must have enough bits allocated to their fractional portions such that they are non-zero after conversion. For instance, here is an example of what a failed conversion would look like. Say,
+\[
+X_{float} = .0453
+\]
+Now applying \texttt{floatToFix.m} defined in section ~\ref{sec:fp} with $F=3$, 
+\[
+X_{fixed} = X_{float} * 2^3 = .3624,
+\]
+\[
+X_{fixed} = round(X_{fixed}) = 0.
+\]
+Clearly, $F=3$ is not enough fractional bits to represent this number, as the original number cannot be recovered from zero. This is how the minimum $F$ was determined for a properly functioning algorithm. A global variable is set for the $F$ that is needed for all the very small numbers, and it is increased until the algorithm did not produce error messages. In a similar fashion, it was also important to determine the minimum $W$ that was needed for the algorithm to work properly. After every floating point conversion or operation, the number of bits needed to represent the number is counted and must be less than another global variable. \\\\
+Normalization was also very important in the conversion process. Fractional portions grow during fixed-point conversion due to the fact that the two fractional portions of the operands add during a multiplication operation. A normalization routine was embedded into the multiplication function \texttt{fixedMult.m} to ensure all results are under the global variable for the $F$ just described. Normalization is also performed at the end of all functions where fixed-point conversion occurs, so all numbers in the main script have $F=0$. A normalization is also performed in the middle of the Kalman filter \texttt{applyKalman.m} since so many multiplication operations occur. In MATLAB, normalization is performed by using \texttt{floatToFix.m} with a negative fractional portion. However, in VHDL this will be as simple as removing all bits to the left of the imaginary decimal point since all numbers are binary strings.\\\\
+The initial design hoped to use 10 bits for integer portion as the largest number in the floating-point code was 1000, and then use the remaining 6 bits for the fractional portion. By the testing and error checking just described, it was quickly seen that this would not work. The two division operations (approached as multiplication of the inverse) that occur once per frame produced extremely small numbers that required at least 20 bits for a fractional portion. Due to this, a larger than desired architecture will be needed for hardware implementation. The fixed-point conversion was completed with a final architecture of 20 fractional bits and 11 integer bits, 
+\[
+(W,F) = (31,20).
+\]
+\textit{Note: }\\
+\textit{All fixed-point software can be found at: }
+\begin{verbatim}
+https://github.com/bbrown1867/ObjectTracking/tree/master/sw
+\end{verbatim}
+\textit{All floating-point software can be found at:} 
+\begin{verbatim} 
+https://github.com/bbrown1867/ObjectTracking/tree/floating_
+point_stable/sw
+\end{verbatim}
 \section{Future Work}
 The most immediate future work that needs to be completed is finishing fixed-point software implementation by finding the bug in \texttt{applyKalman.m} described in the previous section. Once the fixed-point software is complete, hardware description must be completed by translating the MATLAB code to VHDL. It is expected that this will not be very time consuming given that we have written fixed-point software with no dependencies. Once this is completed, or perhaps while it is being completed, interfacing the FPGA with a camera and display and handling the incoming video data will most likely be the biggest challenge in Phase 2 of the project. Figures ~\ref{fig:hw1} and ~\ref{fig:hw2} show two proposed system architectures for Phase 2 of the project. Decisions will need to made about whether or not the system should be entirely self-sustaining (i.e. completely embedded) like in Figure ~\ref{fig:hw1} as opposed to a system which utlizes camera and display resouces from a laptop of desktop CPU like in Figure ~\ref{fig:hw2}.
 \begin{figure}[h]
@@ -362,7 +432,7 @@ The most immediate future work that needs to be completed is finishing fixed-poi
 \end{figure}
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.5\textwidth]{./images/hw_layout_2.jpg}
+\includegraphics[width=0.6\textwidth]{./images/hw_layout_2.jpg}
 \caption{Proposed Hardware Implementation \#2}
 \label{fig:hw2}    
 \end{figure}
