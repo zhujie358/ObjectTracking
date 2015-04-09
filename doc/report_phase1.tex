@@ -1,10 +1,10 @@
-\documentclass[12pt]{article} %Basic document type
+\documentclass[11pt]{article} %Basic document type
 \usepackage{times} %Font 
 \usepackage{amsmath} %For matrices
 \usepackage{amssymb}
 \usepackage[section]{placeins} %Allows FloatBarrier command
 \usepackage[utf8]{inputenc} %Font encoding
-\usepackage[margin=1.25in]{geometry} %Adjust margins
+\usepackage[margin=1.0in]{geometry} %Adjust margins
 \usepackage{graphicx} %Allows picture import
 \usepackage{pdfpages} %Including pdf files 
 \usepackage{setspace}
@@ -374,7 +374,7 @@ The next step in the design, and where the majority of the time was spent during
 \end{itemize}
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.75\textwidth]{./images/software_flow.jpg}
+\includegraphics[width=0.6\textwidth]{./images/software_flow.jpg}
 \caption{Software Flowchart}
 \label{fig:sw_flow}    
 \end{figure}
@@ -395,7 +395,7 @@ Trial \# & Implementation & Execution Time (s) & Results \\ \hline
 \FloatBarrier
 \noindent
 From these results, it was clear that a median filter would be necessary due to the improved results. It was also clear that there was good motive for implementing this algorithm in hardware, as the run-time for a 20 second input video was very long as seen from trial \#4 in Table ~\ref{table:x} when all of our functions were used. \\\\
-The next step in software development was converting the stable floating-point code to fixed-point. This process was described in section ~\ref{sec:fp}, and the converted main script is located in the file \texttt{ObjectTracking\_FI.m}. The helper functions used in fixed-point conversion \texttt{floatToFix.m}, \texttt{fixedMult.m}, and \texttt{fixedAdd.m} are also presented in section ~\ref{sec:fp}. It was important to perform constant error checking and normalization during this process. All numbers that are converted from floating-point to fixed-point must have enough bits allocated to their fractional portions such that they are non-zero after conversion. For instance, here is an example of what a failed conversion would look like. Say,
+The next step in software development was converting the stable floating-point code to fixed-point. This process was described in section ~\ref{sec:fp}, and the converted main script is located in the file \texttt{ObjectTracking} \texttt{\_FI.m}. The helper functions used in fixed-point conversion \texttt{floatToFix.m}, \texttt{fixedMult.m}, and \texttt{fixed} \texttt{Add.m} are also presented in section ~\ref{sec:fp}. It was important to perform constant error checking and normalization during this process. All numbers that are converted from floating-point to fixed-point must have enough bits allocated to their fractional portions such that they are non-zero after conversion. For instance, here is an example of what a failed conversion would look like. Say,
 \[
 X_{float} = .0453
 \]
