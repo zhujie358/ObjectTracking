@@ -44,8 +44,8 @@
 #########
 # Only need v, vhd, sdc, qsf, and qpf files to recreate a project locally
 # Ignore anything else Quartus generates (this will probably need to be updated again at some point):
-*/db/
-*/incremental_db/
+db/
+incremental_db/
 *.rpt
 *.smsg
 *.pin
