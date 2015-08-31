@@ -53,41 +53,42 @@ module vid_io_demo(
 
 //Global Reset
 wire aresetn;
+assign aresetn = KEY[0];
 
-//YCbCr to RGB results
-wire [7:0] R_to_output;
-wire [7:0] B_to_output;
-wire [7:0] G_to_output;
-
-//Rightmost key is global reset, other keys unused
-assign aresetn = KEY[0:0];
-
-//Test minor changes to vga_sync
-assign R_to_output = 'd0;
-assign B_to_output = 'd0;
-assign G_to_output = 'd255;
-
-vga_sync
+//Video IO Pipeline
+pipeline_wrapper pipeline_wrapper_inst
 (
+	.clk 			(CLOCK_50),
+	.aresetn 		(aresetn),
 
-	//Control Signals
-	.clock (CLOCK_50),
-	.aresetn(aresetn),
-	
-	//YCbCr to RGB results
-	.R_in (R_to_output),
-	.B_in (B_to_output),
-	.G_in (G_to_output),
-	
-	//VGA Signals
-	.vga_clk(VGA_CLK),
-	.R (VGA_R),
-	.G (VGA_G),
-	.B (VGA_B),
-	.h_sync(VGA_HS),
-	.v_sync(VGA_VS),
-	.blank_n(VGA_BLANK_N),
-	.sync_n(VGA_SYNC_N)
+	//////// VGA //////////
+	.VGA_B 			(VGA_B),
+	.VGA_BLANK_N 	(VGA_BLANK_N),
+	.VGA_CLK 		(VGA_CLK),
+	.VGA_G			(VGA_G),
+	.VGA_HS 		(VGA_HS),
+	.VGA_R 			(VGA_R),
+	.VGA_SYNC_N 	(VGA_SYNC_N),
+	.VGA_VS 		(VGA_VS),
+
+	//////// TV Decoder //////////
+	.TD_CLK27 		(TD_CLK27),
+	.TD_DATA 		(TD_DATA),
+	.TD_HS 			(TD_HS),
+	.TD_RESET_N 	(TD_RESET_N),
+	.TD_VS 			(TD_VS),
+
+	//////// SDRAM //////////
+	.DRAM_ADDR 		(DRAM_ADDR),
+	.DRAM_BA 		(DRAM_BA),
+	.DRAM_CAS_N 	(DRAM_CAS_N),
+	.DRAM_CKE 		(DRAM_CKE),
+	.DRAM_CLK 		(DRAM_CLK),
+	.DRAM_CS_N 		(DRAM_CS_N),
+	.DRAM_DQ 		(DRAM_DQ),
+	.DRAM_DQM 		(DRAM_DQM),
+	.DRAM_RAS_N		(DRAM_RAS_N),
+	.DRAM_WE_N 		(DRAM_WE_N)
 );
 
 endmodule
