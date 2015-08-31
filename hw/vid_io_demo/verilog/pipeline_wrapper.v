@@ -42,6 +42,17 @@ module pipeline_wrapper
 		output wire 		DRAM_WE_N
 );
 
+//Output Resolution Parameters (units: pixels)
+localparam VGA_RES_POLAR   = 1'b0; // HS and VS are active-low for these settings
+localparam VGA_RES_H_FRONT = 16;   // Horizontal Front Porch
+localparam VGA_RES_H_SYNC  = 98;   // Horizontal Sync Length
+localparam VGA_RES_H_BACK  = 46;   // Horizontal Back Porch
+localparam VGA_RES_H_ACT   = 640;  // Horizontal Actual (Visible)
+localparam VGA_RES_V_FRONT = 11;   // Vertical Front Porch
+localparam VGA_RES_V_SYNC  = 2;    // Vertical Sync Length
+localparam VGA_RES_V_BACK  = 31;   // Vertical Back Porch
+localparam VGA_RES_V_ACT   = 480;  // Vertical Actual (Visible)
+
 // Cascade Resets
 wire			true_reset;
 wire			true_reset0_n;
@@ -57,58 +68,49 @@ wire	[9:0]	decoder_x;
 wire	[3:0]	Remain;
 wire	[9:0]	Quotient;
 
-// For VGA Controller
-wire	[9:0]	mRed;
-wire	[9:0]	mGreen;
-wire	[9:0]	mBlue;
-wire	[10:0]	vga_x;
-wire	[10:0]	vga_y;
-wire			VGA_Read;	//	VGA data request
-wire			m1VGA_Read;	//	Read odd field
-wire			m2VGA_Read;	//	Read even field
+// For field select
+wire	[15:0]	m1YCbCr;    //SDRAM data odd field
+wire	[15:0]	m2YCbCr;    //SDRAM data even field
+wire	[15:0]	mYCbCr_d;   //SDRAM data muxed for odd or even field
+wire	[15:0]	m3YCbCr;    //SDRAM data post one shift reg
+wire	[15:0]	m4YCbCr;    //SDRAM data post two shift reg
+wire	[15:0]	m5YCbCr;    //SDRAM data post all shift regs and mystery logic below
+wire	[15:0]	mYCbCr;		//Final result for conversion
+
+wire	[8:0]	Tmp1,Tmp2;  //Used in mystery logic below
+wire	[7:0]	Tmp3,Tmp4;	//Used in mystery logic below
 
 // For YUV 4:2:2 to YUV 4:4:4
 wire	[7:0]	mY;
 wire	[7:0]	mCb;
 wire	[7:0]	mCr;
 
-//VGA Controller
-wire 	[9:0] 	vga_r10;
-wire 	[9:0] 	vga_g10;
-wire 	[9:0] 	vga_b10;
+// For VGA Controller
+wire	[9:0]	mRed; 		// RGB data after YCbCr conversion
+wire	[9:0]	mGreen;		// RGB data after YCbCr conversion
+wire	[9:0]	mBlue;		// RGB data after YCbCr conversion
+wire			mDVAL; 		// Valid RGB data after YCbCr conversion, unused
+wire	[10:0]	vga_x;		// VGA position, used in 422:444 converter
+wire	[10:0]	vga_y;		// VGA vertical position, used to determine odd or even field
+wire			VGA_Read;	// VGA data request
+wire			m1VGA_Read;	// VGA data request odd field
+wire			m2VGA_Read;	// VGA data request even field
 
-// For field select
-wire	[15:0]	mYCbCr;
-wire	[15:0]	mYCbCr_d;
-wire	[15:0]	m1YCbCr;
-wire	[15:0]	m2YCbCr;
-wire	[15:0]	m3YCbCr;
-
-wire			mDVAL;
-
-wire	[15:0]	m4YCbCr;
-wire	[15:0]	m5YCbCr;
-wire	[8:0]	Tmp1,Tmp2;
-wire	[7:0]	Tmp3,Tmp4;
-
+// Setting this high turns on the TV Decoder
 assign	TD_RESET_N	=	1'b1;
 
-//VGA Controller module is 10-bit but DAC only does 8-bit
-assign VGA_R = vga_r10[9:2];
-assign VGA_G = vga_g10[9:2];
-assign VGA_B = vga_b10[9:2];
-
+// Field Select Logic (Odd/Even)
 assign	m1VGA_Read	=	vga_y[0]		?	1'b0		:	VGA_Read	;
 assign	m2VGA_Read	=	vga_y[0]		?	VGA_Read	:	1'b0		;
-assign	mYCbCr_d	=	~vga_y[0]		?	m1YCbCr		:
-											      m2YCbCr		;
-assign	mYCbCr		=	m5YCbCr;
+assign	mYCbCr_d	=	~vga_y[0]		?	m1YCbCr		:   m2YCbCr		;
 
-assign	Tmp1	=	m4YCbCr[7:0]+mYCbCr_d[7:0];
-assign	Tmp2	=	m4YCbCr[15:8]+mYCbCr_d[15:8];
-assign	Tmp3	=	Tmp1[8:2]+m3YCbCr[7:1];
-assign	Tmp4	=	Tmp2[8:2]+m3YCbCr[15:9];
-assign	m5YCbCr	=	{Tmp4,Tmp3};
+// Mystery Logic
+assign	Tmp1		=	m4YCbCr[7:0]+mYCbCr_d[7:0];
+assign	Tmp2		=	m4YCbCr[15:8]+mYCbCr_d[15:8];
+assign	Tmp3		=	Tmp1[8:2]+m3YCbCr[7:1];
+assign	Tmp4		=	Tmp2[8:2]+m3YCbCr[15:9];
+assign	m5YCbCr		=	{Tmp4,Tmp3};
+assign	mYCbCr		=	m5YCbCr;
 							
 //	TV Decoder Stable Check
 td_detect u2	
@@ -168,7 +170,6 @@ Sdram_Control_4Port	u6
 	//	FIFO Write Side 1
 	.WR1_DATA 		(YCbCr),
 	.WR1 			(YCbCr_valid), 		// Write Enable
-	// .WR1_FULL 		(WR1_FULL),			
 	.WR1_ADDR 		(0),				//TODO: What is this number?
 	.WR1_MAX_ADDR 	(640*507),			//TODO: What is this number?						
 	.WR1_LENGTH 	(9'h80), 			//TODO: What is this number?
@@ -238,32 +239,45 @@ YCbCr2RGB u8
 );
 
 //	VGA Controller
-VGA_Ctrl u9	
-(
-	.iCLK 			(TD_CLK27),
-	.iRST_N 		(true_reset2_n),		
+vga_sync #(
+	.H_TOTAL_WIDTH 	(11),
+	.V_TOTAL_WIDTH 	(11),
+
+	.POLARITY 		(VGA_RES_POLAR),
+
+	.H_FRONT 		(VGA_RES_H_FRONT),
+	.H_SYNC 		(VGA_RES_H_SYNC),
+	.H_BACK 		(VGA_RES_H_BACK),
+	.H_ACT 			(VGA_RES_H_ACT),
+
+	.V_FRONT 		(VGA_RES_V_FRONT),
+	.V_SYNC 		(VGA_RES_V_SYNC),
+	.V_BACK 		(VGA_RES_V_BACK),
+	.V_ACT 			(VGA_RES_V_ACT)
+) vga_sync_inst (
+
+	.clock			(TD_CLK27),
+	.aresetn 		(true_reset2_n),
 
 	//Input Data
-	.iRed 			(mRed),
-	.iGreen 		(mGreen),
-	.iBlue 			(mBlue),
+	.R_in 			(mRed),
+	.G_in 			(mGreen),
+	.B_in 			(mBlue),
 
-	//VGA Position
-	.oCurrent_X 	(vga_x),
-	.oCurrent_Y 	(vga_y),
+	//Output Control Logic
+	.current_x 		(vga_x),
+	.current_y		(vga_y),
+	.ready			(VGA_Read),
 
-	//VGA Ready
-	.oRequest 		(VGA_Read),
-
-	//Generate VGA Signals
-	.oVGA_R 		(vga_r10),
-	.oVGA_G 		(vga_g10),
-	.oVGA_B 		(vga_b10),
-	.oVGA_HS 		(VGA_HS),
-	.oVGA_VS 		(VGA_VS),
-	.oVGA_SYNC 		(VGA_SYNC_N),
-	.oVGA_BLANK 	(VGA_BLANK_N),
-	.oVGA_CLOCK 	(VGA_CLK)
+	//Output VGA Signals
+	.vga_clk		(VGA_CLK),
+	.R_out			(VGA_R),
+	.G_out			(VGA_G),
+	.B_out			(VGA_B),
+	.h_sync			(VGA_HS),
+	.v_sync			(VGA_VS),
+	.blank_n		(VGA_BLANK_N),
+	.sync_n			(VGA_SYNC_N)
 );
 
 //	Shift Register Megafunction
