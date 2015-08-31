@@ -52,3 +52,4 @@ incremental_db/
 *.sof
 *.summary
 *.done
+*.txt
