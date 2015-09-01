@@ -34,7 +34,7 @@ module vga_sync #(
 	//Output Control Logic
 	output wire [(H_TOTAL_WIDTH-1):0] 	current_x,
 	output wire [(V_TOTAL_WIDTH-1):0] 	current_y,
-	output wire 					  			ready,
+	output wire 					  	ready,
 
 	//Output VGA Signals
 	output wire 						vga_clk,
@@ -71,7 +71,7 @@ assign current_x = (hor_pos >= H_BLANK) ? hor_pos - H_BLANK : 'd0;
 assign current_y = (ver_pos >= V_BLANK) ? ver_pos - V_BLANK : 'd0;
 
 //Horizontal Data
-always @(posedge clock) begin
+always @(posedge clock or negedge aresetn) begin
 	if (~aresetn)	
 		begin
 			hor_pos <= 'd0;
@@ -89,7 +89,7 @@ always @(posedge clock) begin
 end
 
 //Vertical Data
-always @(posedge h_sync) begin
+always @(posedge h_sync or negedge aresetn) begin
 	if (~aresetn)	
 		begin
 			ver_pos <= 'd0;
@@ -107,7 +107,7 @@ always @(posedge h_sync) begin
 end
 
 //RGB Data
-always @(posedge clock) begin
+always @(posedge clock or negedge aresetn) begin
 	if (~aresetn) 
 		begin
 			R_out <= 8'd0;
