@@ -331,10 +331,8 @@ set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Sdram_Control_4
 set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Sdram_Control_4Port/command.v
 set_global_assignment -name VERILOG_FILE verilog/terasic_modules/YUV422_to_444.v
 set_global_assignment -name VERILOG_FILE verilog/terasic_modules/YCbCr2RGB.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/VGA_Ctrl.v
 set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Reset_Delay.v
 set_global_assignment -name VERILOG_FILE verilog/terasic_modules/MAC_3.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Line_Buffer.v
 set_global_assignment -name VERILOG_FILE verilog/terasic_modules/ITU_656_Decoder.v
 set_global_assignment -name VERILOG_FILE verilog/td_detect.v
 set_global_assignment -name VERILOG_FILE verilog/pipeline_wrapper.v

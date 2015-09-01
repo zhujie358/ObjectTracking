@@ -75,7 +75,7 @@ always @(posedge clock) begin
 	if (~aresetn)	
 		begin
 			hor_pos <= 'd0;
-			h_sync  <= 1'b0;
+			h_sync  <= is_active_high ? 1'b0 : 1'b1;
 		end
 	else
 		begin
@@ -93,7 +93,7 @@ always @(posedge h_sync) begin
 	if (~aresetn)	
 		begin
 			ver_pos <= 'd0;
-			v_sync  <= 1'b0;
+			v_sync  <= is_active_high ? 1'b0 : 1'b1;
 		end
 	else
 		begin

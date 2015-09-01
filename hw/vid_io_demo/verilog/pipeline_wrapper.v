@@ -82,13 +82,8 @@ wire	[9:0]	Quotient;
 wire	[15:0]	m1YCbCr;    // SDRAM data odd field
 wire	[15:0]	m2YCbCr;    // SDRAM data even field
 wire	[15:0]	mYCbCr_d;   // SDRAM data muxed for odd or even field
-wire	[15:0]	m3YCbCr;    // SDRAM data post one shift reg
-wire	[15:0]	m4YCbCr;    // SDRAM data post two shift reg
-wire	[15:0]	m5YCbCr;    // SDRAM data post all shift regs and mystery logic
-wire	[15:0]	mYCbCr;		// Final result for conversion
-
-wire	[8:0]	Tmp1,Tmp2;  // Used in mystery logic
-wire	[7:0]	Tmp3,Tmp4;	// Used in mystery logic
+wire			m1VGA_Read;	// VGA data request odd field
+wire			m2VGA_Read;	// VGA data request even field
 
 // For YUV 4:2:2 to YUV 4:4:4
 wire	[7:0]	mY;
@@ -103,24 +98,9 @@ wire			mDVAL; 		// Valid RGB data after YCbCr conversion, unused
 wire	[10:0]	vga_x;		// VGA position, used in 422:444 converter
 wire	[10:0]	vga_y;		// VGA vertical position, used to determine odd or even field
 wire			VGA_Read;	// VGA data request
-wire			m1VGA_Read;	// VGA data request odd field
-wire			m2VGA_Read;	// VGA data request even field
 
-// Setting this high turns on the TV Decoder
+// TV Decoder Turned On
 assign	TD_RESET_N	=	1'b1;
-
-// Field Select Logic (Odd/Even)
-assign	m1VGA_Read	=	vga_y[0]		?	1'b0		:	VGA_Read	;
-assign	m2VGA_Read	=	vga_y[0]		?	VGA_Read	:	1'b0		;
-assign	mYCbCr_d	=	~vga_y[0]		?	m1YCbCr		:   m2YCbCr		;
-
-// Mystery Logic
-assign	Tmp1		=	m4YCbCr[7:0]+mYCbCr_d[7:0];
-assign	Tmp2		=	m4YCbCr[15:8]+mYCbCr_d[15:8];
-assign	Tmp3		=	Tmp1[8:2]+m3YCbCr[7:1];
-assign	Tmp4		=	Tmp2[8:2]+m3YCbCr[15:9];
-assign	m5YCbCr		=	{Tmp4,Tmp3};
-assign	mYCbCr		=	m5YCbCr;
 							
 //	TV Decoder Stable Check
 td_detect u2	
@@ -201,7 +181,7 @@ Sdram_Control_4Port	u6
 	.RD2_ADDR 		(VGA_RES_H_ACT*LINES_EVEN_START),	// Bypass the blanking lines
 	.RD2_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END  ),	// Read out of the valid even lines
 	.RD2_LENGTH 	(9'h80),            				// Just being consistent with write length?
-	.RD2_LOAD 		(!true_reset0_n),   				// Clears FIFO
+	.RD2_LOAD 		(~true_reset0_n),   				// Clears FIFO
 	.RD2_CLK  		(TD_CLK27),
 
 	// SDRAM
@@ -217,14 +197,19 @@ Sdram_Control_4Port	u6
 	.SDR_CLK 		(DRAM_CLK)	
 );
 
+// Field Select Logic (Odd/Even)
+assign	m1VGA_Read	= vga_y[0]  ? 1'b0	 	:  VGA_Read;
+assign	m2VGA_Read	= vga_y[0]  ? VGA_Read  :  1'b0;
+assign	mYCbCr_d	= ~vga_y[0] ? m1YCbCr	:  m2YCbCr;
+
 //	YUV 4:2:2 to YUV 4:4:4
 YUV422_to_444 u7 
 (	
 	.iCLK 			(TD_CLK27),
 	.iRST_N 		(true_reset0_n),
 
-	.iX 			(vga_x-160),				// postion_x - H_BLANK
-	.iYCbCr 		(mYCbCr),
+	.iX 			(vga_x),
+	.iYCbCr 		(mYCbCr_d),				
 	
 	.oY 			(mY),
 	.oCb 			(mCb),
@@ -288,30 +273,6 @@ vga_sync #(
 	.v_sync			(VGA_VS),
 	.blank_n		(VGA_BLANK_N),
 	.sync_n			(VGA_SYNC_N)
-);
-
-//	Shift Register Megafunction
-Line_Buffer u10	
-(	
-	.clock 			(TD_CLK27),
-	.aclr 			(~true_reset0_n),
-	.clken 			(VGA_Read),
-	
-	.shiftin  		(mYCbCr_d),
-
-	.shiftout 		(m3YCbCr)
-);
-
-//	Shift Register Megafunction
-Line_Buffer u11	
-(	
-	.clock 			(TD_CLK27),
-	.aclr 			(~true_reset0_n),
-	.clken 			(VGA_Read),
-	
-	.shiftin 		(m3YCbCr),
-
-	.shiftout 		(m4YCbCr)
 );
 
 endmodule
