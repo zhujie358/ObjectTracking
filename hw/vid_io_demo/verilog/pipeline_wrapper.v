@@ -42,16 +42,26 @@ module pipeline_wrapper
 		output wire 		DRAM_WE_N
 );
 
-//Output Resolution Parameters (units: pixels)
-localparam VGA_RES_POLAR   = 1'b0; // HS and VS are active-low for these settings
-localparam VGA_RES_H_FRONT = 16;   // Horizontal Front Porch
-localparam VGA_RES_H_SYNC  = 98;   // Horizontal Sync Length
-localparam VGA_RES_H_BACK  = 46;   // Horizontal Back Porch
-localparam VGA_RES_H_ACT   = 640;  // Horizontal Actual (Visible)
-localparam VGA_RES_V_FRONT = 11;   // Vertical Front Porch
-localparam VGA_RES_V_SYNC  = 2;    // Vertical Sync Length
-localparam VGA_RES_V_BACK  = 31;   // Vertical Back Porch
-localparam VGA_RES_V_ACT   = 480;  // Vertical Actual (Visible)
+// Input Resolution Parameters (units: pixels)
+localparam NTSC_RES_H 	   		= 720;
+
+// Output Resolution Parameters (units: pixels)
+localparam VGA_RES_POLAR   		= 1'b0; // HS and VS are active-low for these settings
+localparam VGA_RES_H_FRONT 		= 16;   // Horizontal Front Porch
+localparam VGA_RES_H_SYNC  		= 98;   // Horizontal Sync Length
+localparam VGA_RES_H_BACK  		= 46;   // Horizontal Back Porch
+localparam VGA_RES_H_ACT   		= 640;  // Horizontal Actual (Visible)
+localparam VGA_RES_V_FRONT 		= 11;   // Vertical Front Porch
+localparam VGA_RES_V_SYNC  		= 2;    // Vertical Sync Length
+localparam VGA_RES_V_BACK  		= 31;   // Vertical Back Porch
+localparam VGA_RES_V_ACT   		= 480;  // Vertical Actual (Visible)
+localparam VGA_RES_V_ACT_2 		= 240;  // Just divide the above number by 2
+
+// SDRAM Parameters (units: pixels)
+localparam LINES_ODD_START 		= VGA_RES_V_FRONT  + VGA_RES_V_SYNC;
+localparam LINES_ODD_END    	= LINES_ODD_START  + VGA_RES_V_ACT_2;
+localparam LINES_EVEN_START 	= LINES_ODD_END    + LINES_ODD_START + 1;  
+localparam LINES_EVEN_END   	= LINES_EVEN_START + VGA_RES_V_ACT_2;
 
 // Cascade Resets
 wire			true_reset;
@@ -69,16 +79,16 @@ wire	[3:0]	Remain;
 wire	[9:0]	Quotient;
 
 // For field select
-wire	[15:0]	m1YCbCr;    //SDRAM data odd field
-wire	[15:0]	m2YCbCr;    //SDRAM data even field
-wire	[15:0]	mYCbCr_d;   //SDRAM data muxed for odd or even field
-wire	[15:0]	m3YCbCr;    //SDRAM data post one shift reg
-wire	[15:0]	m4YCbCr;    //SDRAM data post two shift reg
-wire	[15:0]	m5YCbCr;    //SDRAM data post all shift regs and mystery logic below
-wire	[15:0]	mYCbCr;		//Final result for conversion
+wire	[15:0]	m1YCbCr;    // SDRAM data odd field
+wire	[15:0]	m2YCbCr;    // SDRAM data even field
+wire	[15:0]	mYCbCr_d;   // SDRAM data muxed for odd or even field
+wire	[15:0]	m3YCbCr;    // SDRAM data post one shift reg
+wire	[15:0]	m4YCbCr;    // SDRAM data post two shift reg
+wire	[15:0]	m5YCbCr;    // SDRAM data post all shift regs and mystery logic
+wire	[15:0]	mYCbCr;		// Final result for conversion
 
-wire	[8:0]	Tmp1,Tmp2;  //Used in mystery logic below
-wire	[7:0]	Tmp3,Tmp4;	//Used in mystery logic below
+wire	[8:0]	Tmp1,Tmp2;  // Used in mystery logic
+wire	[7:0]	Tmp3,Tmp4;	// Used in mystery logic
 
 // For YUV 4:2:2 to YUV 4:4:4
 wire	[7:0]	mY;
@@ -155,7 +165,7 @@ DIV u5
 	.aclr 			(~true_reset0_n),	
 	
 	.numer 			(decoder_x),
-	.denom 			(4'h9),			// 720 - 640 = 80, 720/80 = 9. Skip a sample every 9 pixels.
+	.denom 			(4'h9),			// 720 - 640 = 80, 720/80 = 9. Skip a sample once every 9 pixels.
 
 	.quotient 		(Quotient),
 	.remain 		(Remain)
@@ -169,29 +179,29 @@ Sdram_Control_4Port	u6
 
 	//	FIFO Write Side 1
 	.WR1_DATA 		(YCbCr),
-	.WR1 			(YCbCr_valid), 		// Write Enable
-	.WR1_ADDR 		(0),				//TODO: What is this number?
-	.WR1_MAX_ADDR 	(640*507),			//TODO: What is this number?						
-	.WR1_LENGTH 	(9'h80), 			//TODO: What is this number?
-	.WR1_LOAD 		(~true_reset0_n), 	// Clears FIFO
+	.WR1 			(YCbCr_valid), 					// Write Enable
+	.WR1_ADDR 		(0),							// Base address
+	.WR1_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END),	// Store every pixel of every line. Blanking lines, odd lines, blanking lines, and even lines.
+	.WR1_LENGTH 	(9'h80), 						// The valid signal drops low every 8 samples, 16*8 = 128 bits per burst?
+	.WR1_LOAD 		(~true_reset0_n), 				// Clears FIFO
 	.WR1_CLK 		(TD_CLK27),
 
 	 // FIFO Read Side 1 (Odd Field, Bypass Blanking)
     .RD1_DATA 		(m1YCbCr),
-	.RD1 			(m1VGA_Read), 		// Read Enable
-	.RD1_ADDR 		(640*13),			//TODO: What is this number?
-	.RD1_MAX_ADDR 	(640*253),			//TODO: What is this number?				
-	.RD1_LENGTH 	(9'h80),  			//TODO: What is this number?
-	.RD1_LOAD 		(~true_reset0_n),   // Clears FIFO
+	.RD1 			(m1VGA_Read), 					 	// Read Enable
+	.RD1_ADDR 		(VGA_RES_H_ACT*LINES_ODD_START), 	// Bypass the blanking lines
+	.RD1_MAX_ADDR 	(VGA_RES_H_ACT*LINES_ODD_END  ),	// Read out of the valid odd lines
+	.RD1_LENGTH 	(9'h80),  							// Just being consistent with write length?
+	.RD1_LOAD 		(~true_reset0_n),   				// Clears FIFO
 	.RD1_CLK 		(TD_CLK27),
 
 	// FIFO Read Side 2 (Even Field, Bypass Blanking)
     .RD2_DATA 		(m2YCbCr),
-	.RD2 			(m2VGA_Read),		// Read Enable
-	.RD2_ADDR 		(640*267),			//TODO: What is this number?
-	.RD2_MAX_ADDR 	(640*507),		 	//TODO: What is this number?				
-	.RD2_LENGTH 	(9'h80),            //TODO: What is this number?
-	.RD2_LOAD 		(!true_reset0_n),   // Clears FIFO
+	.RD2 			(m2VGA_Read),						// Read Enable
+	.RD2_ADDR 		(VGA_RES_H_ACT*LINES_EVEN_START),	// Bypass the blanking lines
+	.RD2_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END  ),	// Read out of the valid even lines
+	.RD2_LENGTH 	(9'h80),            				// Just being consistent with write length?
+	.RD2_LOAD 		(!true_reset0_n),   				// Clears FIFO
 	.RD2_CLK  		(TD_CLK27),
 
 	// SDRAM
