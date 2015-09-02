@@ -9,7 +9,6 @@
 
 module pipeline_wrapper
 (
-		input wire 			clk,
 		input wire 			aresetn,
 
 		//////// VGA //////////
@@ -63,10 +62,6 @@ localparam LINES_ODD_END    	= LINES_ODD_START  + VGA_RES_V_ACT_2;
 localparam LINES_EVEN_START 	= LINES_ODD_END    + LINES_ODD_START + 1;  
 localparam LINES_EVEN_END   	= LINES_EVEN_START + VGA_RES_V_ACT_2;
 
-// Stabilizer & Reset Delay
-wire			true_reset;
-wire			true_reset0_n;
-
 // ITU-R 656 Decoder
 wire	[15:0]	YCbCr;
 wire			YCbCr_valid_1;
@@ -104,30 +99,11 @@ wire			vga_ready;	// VGA data request
 // TV Decoder Turned On
 assign	TD_RESET_N	=	1'b1;
 							
-//	TV Decoder Stable Check
-td_detect u2	
-(	
-	.iRST_N			(aresetn),
-	.iTD_VS			(TD_VS),
-	.iTD_HS			(TD_HS),
-
-	.oTD_Stable 	(true_reset)
-);
-
-//	Reset Delay
-Reset_Delay	u3	
-(	
-	.iCLK 			(clk),
-	.iRST 			(true_reset),
-
-	.oRST_0 		(true_reset0_n)
-);
-
 //	ITU-R 656 to YUV 4:2:2
 ITU_656_Decoder	u4	
 (	
 	.iCLK_27 		(TD_CLK27),
-	.iRST_N 		(true_reset0_n),
+	.iRST_N 		(aresetn),
 	
 	.iTD_DATA 		(TD_DATA),
 	.iSwap_CbCr 	(Quotient[0]),
@@ -142,7 +118,7 @@ ITU_656_Decoder	u4
 DIV u5	
 (	
 	.clock 			(TD_CLK27),
-	.aclr 			(~true_reset0_n),	
+	.aclr 			(~aresetn),	
 	
 	.numer 			(decoder_x),
 	.denom 			(4'h9),			// 720 - 640 = 80, 720/80 = 9. Skip a sample once every 9 pixels.
@@ -155,7 +131,7 @@ DIV u5
 yuv422_to_yuv444 u7 
 (	
 	.iCLK 			(TD_CLK27),
-	.iRST_N 		(true_reset0_n),
+	.iRST_N 		(aresetn),
 
 	.iYCbCr 		(YCbCr),
 	.iYCbCr_valid   (YCbCr_valid_1),	
@@ -170,7 +146,7 @@ yuv422_to_yuv444 u7
 YCbCr2RGB u8
 (
 	.iCLK 			(TD_CLK27),
-	.iRESET 		(~true_reset0_n),
+	.iRESET 		(~aresetn),
 
 	.iY 			(mY),
 	.iCb  			(mCb),
@@ -190,7 +166,7 @@ assign rgb_packed_write = {Red[9:5], Green[9:4], Blue[9:5]};
 Sdram_Control_4Port	u6	
 (
     .REF_CLK 		(TD_CLK27),
-    .RESET_N 		(true_reset0_n),
+    .RESET_N 		(aresetn),
 
 	//	FIFO Write Side 1
 	.WR1_DATA 		(rgb_packed_write),
@@ -198,7 +174,7 @@ Sdram_Control_4Port	u6
 	.WR1_ADDR 		(0),							// Base address
 	.WR1_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END),	// Store every pixel of every line. Blanking lines, odd lines, blanking lines, and even lines.
 	.WR1_LENGTH 	(9'h80), 						// The valid signal drops low every 8 samples, 16*8 = 128 bits per burst?
-	.WR1_LOAD 		(~true_reset0_n), 				// Clears FIFO
+	.WR1_LOAD 		(~aresetn), 				// Clears FIFO
 	.WR1_CLK 		(TD_CLK27),
 
 	 // FIFO Read Side 1 (Odd Field, Bypass Blanking)
@@ -207,7 +183,7 @@ Sdram_Control_4Port	u6
 	.RD1_ADDR 		(VGA_RES_H_ACT*LINES_ODD_START), 	// Bypass the blanking lines
 	.RD1_MAX_ADDR 	(VGA_RES_H_ACT*LINES_ODD_END  ),	// Read out of the valid odd lines
 	.RD1_LENGTH 	(9'h80),  							// Just being consistent with write length?
-	.RD1_LOAD 		(~true_reset0_n),   				// Clears FIFO
+	.RD1_LOAD 		(~aresetn),   				// Clears FIFO
 	.RD1_CLK 		(TD_CLK27),
 
 	// FIFO Read Side 2 (Even Field, Bypass Blanking)
@@ -216,7 +192,7 @@ Sdram_Control_4Port	u6
 	.RD2_ADDR 		(VGA_RES_H_ACT*LINES_EVEN_START),	// Bypass the blanking lines
 	.RD2_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END  ),	// Read out of the valid even lines
 	.RD2_LENGTH 	(9'h80),            				// Just being consistent with write length?
-	.RD2_LOAD 		(~true_reset0_n),   				// Clears FIFO
+	.RD2_LOAD 		(~aresetn),   				// Clears FIFO
 	.RD2_CLK  		(TD_CLK27),
 
 	// SDRAM
@@ -256,7 +232,7 @@ vga_sync #(
 ) vga_sync_inst (
 
 	.clock			(TD_CLK27),
-	.aresetn 		(true_reset0_n),
+	.aresetn 		(aresetn),
 
 	//Input Data
 	.R_in 			({rgb_packed_read[15:11], 5'b00000}),

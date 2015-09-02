@@ -57,7 +57,6 @@ assign aresetn = KEY[0];
 //Video IO Pipeline
 pipeline_wrapper pipeline_wrapper_inst
 (
-	.clk 			(CLOCK_50),
 	.aresetn 		(aresetn),
 
 	//////// VGA //////////
