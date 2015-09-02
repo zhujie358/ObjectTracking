@@ -180,7 +180,7 @@ YCbCr2RGB u8
 	.Red 			(Red),
 	.Green 			(Green),
 	.Blue 			(Blue),
-	.oDVAL 			(RGB_valid),
+	.oDVAL 			(RGB_valid)
 );
 
 // RGB 30-bit to RGB 16-bit
