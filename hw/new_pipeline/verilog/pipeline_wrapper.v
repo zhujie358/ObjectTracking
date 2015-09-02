@@ -63,22 +63,32 @@ localparam LINES_ODD_END    	= LINES_ODD_START  + VGA_RES_V_ACT_2;
 localparam LINES_EVEN_START 	= LINES_ODD_END    + LINES_ODD_START + 1;  
 localparam LINES_EVEN_END   	= LINES_EVEN_START + VGA_RES_V_ACT_2;
 
-// Cascade Resets
+// Stabilizer & Reset Delay
 wire			true_reset;
 wire			true_reset0_n;
-wire			true_reset1_n;
-wire			true_reset2_n;
 
 // ITU-R 656 Decoder
 wire	[15:0]	YCbCr;
-wire			YCbCr_valid;
+wire			YCbCr_valid_1;
 wire	[9:0]	decoder_x;
 
 // Down Sample
 wire	[3:0]	Remain;
 wire	[9:0]	Quotient;
 
-// For field select
+// YUV 4:2:2 to YUV 4:4:4
+wire	[7:0]	mY;
+wire	[7:0]	mCb;
+wire	[7:0]	mCr;
+wire 			YCbCr_valid_2;
+
+//YCbCr to RGB
+wire	[9:0]	Red; 		// RGB data after YCbCr conversion
+wire	[9:0]	Green;		// RGB data after YCbCr conversion
+wire	[9:0]	Blue;		// RGB data after YCbCr conversion
+wire			RGB_valid; 	// Valid RGB data after YCbCr conversion, unused
+
+// Field Select
 wire [15:0] rgb_packed_write;	// SDRAM write data
 wire [15:0] rgb_packed_read;	// SDRAM read data muxed for odd or even field
 wire [15:0] rgb_packed_odd;		// SDRAM data odd field
@@ -86,16 +96,7 @@ wire [15:0] rgb_packed_even;	// SDRAM data even field
 wire		vga_odd_ready;		// VGA data request odd field
 wire		vga_even_ready;		// VGA data request even field
 
-// For YUV 4:2:2 to YUV 4:4:4
-wire	[7:0]	mY;
-wire	[7:0]	mCb;
-wire	[7:0]	mCr;
-
-// For VGA Controller
-wire	[9:0]	mRed; 		// RGB data after YCbCr conversion
-wire	[9:0]	mGreen;		// RGB data after YCbCr conversion
-wire	[9:0]	mBlue;		// RGB data after YCbCr conversion
-wire			mDVAL; 		// Valid RGB data after YCbCr conversion, unused
+// VGA Controller
 wire	[10:0]	vga_x;		// VGA position, used in 422:444 converter
 wire	[10:0]	vga_y;		// VGA vertical position, used to determine odd or even field
 wire			vga_ready;	// VGA data request
@@ -119,16 +120,14 @@ Reset_Delay	u3
 	.iCLK 			(clk),
 	.iRST 			(true_reset),
 
-	.oRST_0 		(true_reset0_n),
-	.oRST_1			(true_reset1_n),
-	.oRST_2			(true_reset2_n)
+	.oRST_0 		(true_reset0_n)
 );
 
 //	ITU-R 656 to YUV 4:2:2
 ITU_656_Decoder	u4	
 (	
 	.iCLK_27 		(TD_CLK27),
-	.iRST_N 		(true_reset1_n),
+	.iRST_N 		(true_reset0_n),
 	
 	.iTD_DATA 		(TD_DATA),
 	.iSwap_CbCr 	(Quotient[0]),
@@ -136,7 +135,7 @@ ITU_656_Decoder	u4
 
 	.oTV_X 			(decoder_x),
 	.oYCbCr 		(YCbCr),
-	.oDVAL 			(YCbCr_valid)
+	.oDVAL 			(YCbCr_valid_1)
 );
 
 //	Divide Megafuncion (Used to Down Sample)
@@ -158,32 +157,34 @@ yuv422_to_yuv444 u7
 	.iCLK 			(TD_CLK27),
 	.iRST_N 		(true_reset0_n),
 
-	.iYCbCr 		(YCbCr),	
+	.iYCbCr 		(YCbCr),
+	.iYCbCr_valid   (YCbCr_valid_1),	
 	
 	.oY 			(mY),
 	.oCb 			(mCb),
-	.oCr  			(mCr)
+	.oCr  			(mCr),
+	.oYCbCr_valid   (YCbCr_valid_2)
 );
 
 //	YCbCr 8-bit to RGB-10 bit 
 YCbCr2RGB u8
 (
 	.iCLK 			(TD_CLK27),
-	.iRESET 		(~true_reset2_n),
+	.iRESET 		(~true_reset0_n),
 
 	.iY 			(mY),
 	.iCb  			(mCb),
 	.iCr 			(mCr),
-	.iDVAL 			(YCbCr_valid),
+	.iDVAL 			(YCbCr_valid_2),
 
-	.Red 			(mRed),
-	.Green 			(mGreen),
-	.Blue 			(mBlue),
-	.oDVAL 			(mDVAL),
+	.Red 			(Red),
+	.Green 			(Green),
+	.Blue 			(Blue),
+	.oDVAL 			(RGB_valid),
 );
 
 // RGB 30-bit to RGB 16-bit
-assign rgb_packed_write = {mRed[9:5], mGreen[9:4], mBlue[9:5]};
+assign rgb_packed_write = {Red[9:5], Green[9:4], Blue[9:5]};
 
 //	SDRAM Frame Buffer
 Sdram_Control_4Port	u6	
@@ -193,7 +194,7 @@ Sdram_Control_4Port	u6
 
 	//	FIFO Write Side 1
 	.WR1_DATA 		(rgb_packed_write),
-	.WR1 			(mDVAL), 						// Write Enable
+	.WR1 			(RGB_valid), 					// Write Enable
 	.WR1_ADDR 		(0),							// Base address
 	.WR1_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END),	// Store every pixel of every line. Blanking lines, odd lines, blanking lines, and even lines.
 	.WR1_LENGTH 	(9'h80), 						// The valid signal drops low every 8 samples, 16*8 = 128 bits per burst?
@@ -255,7 +256,7 @@ vga_sync #(
 ) vga_sync_inst (
 
 	.clock			(TD_CLK27),
-	.aresetn 		(true_reset2_n),
+	.aresetn 		(true_reset0_n),
 
 	//Input Data
 	.R_in 			({rgb_packed_read[15:11], 5'b00000}),
