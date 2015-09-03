@@ -11,6 +11,7 @@ The goal of this experiment was to generate an arbitrary VGA display using the D
 To properly drive these signals, the VGA timing specifications needed to be understood. There are a lot of resources on VGA timing a Google search away. The basics is that you need to get the number of pixels horizontally and vertically for the four regions of the VGA display: front porch, sync, actual visible area, and back porch. The sum of the regions that aren't the visible area are the blanking periods. This is where the `VGA_HS`, `VGA_VS` signals get toggled. Each set of parameters comes with a necessary clock frequency and a polarity for the sync signals. You just need to pick a set of parameters, generate two counters for the pixels and lines, and then drive the signals in the appropriate regions.
 
 The two sources used when writing the module `vga_sync.v`.
+
 1. Terasic provides an example design for working with video input and output on the DE2 board, located in the `DE2_115_demonstrations/DE2_115_TV` directory of the system CD that comes with the board. In this demonstration is a Verilog module named `VGA_Ctrl.v` that was referenced heavily.
 2. This [video tutorial](https://www.youtube.com/watch?v=WK5FT5RD1sU).
 
