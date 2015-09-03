@@ -321,20 +321,20 @@ set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
-set_global_assignment -name VERILOG_FILE verilog/yuv422_to_yuv444.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Sdram_Control_4Port/Sdram_WR_FIFO.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Sdram_Control_4Port/Sdram_RD_FIFO.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Sdram_Control_4Port/Sdram_PLL.v
-set_global_assignment -name SOURCE_FILE verilog/terasic_modules/Sdram_Control_4Port/Sdram_Params.h
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Sdram_Control_4Port/Sdram_Control_4Port.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Sdram_Control_4Port/sdr_data_path.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Sdram_Control_4Port/control_interface.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/Sdram_Control_4Port/command.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/YCbCr2RGB.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/MAC_3.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/ITU_656_Decoder.v
-set_global_assignment -name VERILOG_FILE verilog/terasic_modules/DIV.v
+set_global_assignment -name VERILOG_FILE verilog/Sdram_Control_4Port/Sdram_WR_FIFO.v
+set_global_assignment -name VERILOG_FILE verilog/Sdram_Control_4Port/Sdram_RD_FIFO.v
+set_global_assignment -name VERILOG_FILE verilog/Sdram_Control_4Port/Sdram_PLL.v
+set_global_assignment -name SOURCE_FILE verilog/Sdram_Control_4Port/Sdram_Params.h
+set_global_assignment -name VERILOG_FILE verilog/Sdram_Control_4Port/Sdram_Control_4Port.v
+set_global_assignment -name VERILOG_FILE verilog/Sdram_Control_4Port/sdr_data_path.v
+set_global_assignment -name VERILOG_FILE verilog/Sdram_Control_4Port/control_interface.v
+set_global_assignment -name VERILOG_FILE verilog/Sdram_Control_4Port/command.v
+set_global_assignment -name VERILOG_FILE verilog/video_input/yuv422_to_yuv444.v
+set_global_assignment -name VERILOG_FILE verilog/video_input/YCbCr2RGB.v
+set_global_assignment -name VERILOG_FILE verilog/video_input/video_input.v
+set_global_assignment -name VERILOG_FILE verilog/video_input/MAC_3.v
+set_global_assignment -name VERILOG_FILE verilog/video_input/ITU_656_Decoder.v
+set_global_assignment -name VERILOG_FILE verilog/video_input/DIV.v
 set_global_assignment -name VERILOG_FILE verilog/vga_sync.v
-set_global_assignment -name VERILOG_FILE verilog/pipeline_wrapper.v
 set_global_assignment -name SDC_FILE new_pipeline.SDC
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

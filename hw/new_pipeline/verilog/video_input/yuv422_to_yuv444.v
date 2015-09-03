@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////
 // File:   yuv422_to_yuv444.v
-// Author: Tersaic, modified by BBB
+// Author: Tersaic, modified by B. Brown
 // Source: YUV422_to_444.v
 // About:  Removed VGA dependency. Minor syntax changes.	 
 ////////////////////////////////////////////////////////////////

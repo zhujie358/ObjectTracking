@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////
 // File:   vga_sync.v
-// Author: BBB (based on Terasic module VGA_Ctrl.v)
+// Author: B. Brown (based on Terasic module VGA_Ctrl.v)
 // About:  Same VGA controller from vga_demo except push button
 // 		   logic has been removed and input RGB data added.
 ////////////////////////////////////////////////////////////////
