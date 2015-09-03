@@ -2,7 +2,7 @@
 ### Overview
 The Altera DE2-115 board by Terasic comes with an example design (Quartus II and Verilog files) for using the ADV7123, ADV7181, and the SDRAM to display an input video source on a VGA display. This demonstration is located in the `DE2_115_demonstrations/DE2_115_TV` directory of the system CD as mentioned in the previous experiment, and was the foundation for this experiment. The goal of this experiment was to dive into the demonstration and figure out from a system perspective how real-time video can be displayed on a computer monitor using the Cyclone IV and the DE2 periperals. 
 
-### Required Hardware
+### Hardware Used
 The first step of this experiment was simply compiling and programming the Terasic demo onto the DE2 board and testing it with the following hardware.
 
 1.  Altera DE2 board (obviously)
