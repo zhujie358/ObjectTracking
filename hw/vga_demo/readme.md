@@ -17,7 +17,7 @@ The two sources used when writing the module `vga_sync.v`.
 
 ### Hardware Used
 
-1.  Altera DE2 board (obviously)
+1.  Altera DE2 board
 2.  VGA cable
 3.  Acer LED monitor with a VGA port
 
