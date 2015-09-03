@@ -15,10 +15,11 @@ The two sources used when writing the module `vga_sync.v`.
 1. Terasic provides an example design for working with video input and output on the DE2 board, located in the `DE2_115_demonstrations/DE2_115_TV` directory of the system CD that comes with the board. In this demonstration is a Verilog module named `VGA_Ctrl.v` that was referenced heavily.
 2. This [video tutorial](https://www.youtube.com/watch?v=WK5FT5RD1sU).
 
-### Required Hardware
-This experiment can be recreated locally by using the Quartus II and Verilog files in this directory, as well as the following hardware.
-1. Altera DE2 board. The components used are just the Cyclone IV FPGA and the ADV7123.
-2. VGA cable and a display with a VGA port.
+### Hardware Used
+
+1.  Altera DE2 board (obviously)
+2.  VGA cable
+3.  Acer LED monitor with a VGA port
 
 ### Challenges
 The biggest challenge faced when making this module was trying to use the parameters the Terasic demo had used. In the demo, a 640x480 resolution is used which requires a 25 MHz clock. The only clock available in the experiment top-level was the 50 MHz clock, so a clock-divider module was created to try to reduce it. This did not work, as the clock produced by the clock-divider was not stable enough for the VGA interface. Instead, a 800x600 resolution was used since it required a 50 MHz clock. In retrospect, the 25 MHz clock could have been taken from the TV decoder chip or generated with a PLL.
