@@ -53,3 +53,6 @@ incremental_db/
 *.summary
 *.done
 *.txt
+
+# Ignore any symbolic Makefiles or other instances
+hw/*/Makefile
