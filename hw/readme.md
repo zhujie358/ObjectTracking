@@ -25,12 +25,14 @@ A new experiment (that works with the Makefile flow) can be created by following
 7. Set the variable `EXP_NAME` in the Makefile to the name of your new experiment.
 
 ## Using the Makefile Flow
-To use the Makefile flow and recreate the results from any of the experiments, start by repeating steps 5 and 6 from the process above for the experiment of interest.
+To use the Makefile flow and recreate the results from any of the experiments, start by repeating steps 6 and 7 from the process above for the experiment of interest.
 
 In the experiment directory, type `make` into your shell to see the list of options.
 
 ### Hardware
-All Makefile options starting with `hw_` are hardware targets. `hw_all` will perform the entire FPGA sequence, starting with source file compilation, place and route, bistream generation, and finally programming. 
+All Makefile options starting with `hw_` are hardware targets. `hw_all` will perform the entire FPGA sequence, starting with source file compilation, place and route, bistream generation, and finally device programming. When running `hw_all` or `hw_prog`, make sure the DE2 is plugged in.
+
+Quartus II is required for Makefile hardware targets. Specifically, Version 10.1 Web Edition is being used for development.
 
 ### Simulation 
 The Makefile option `simulate` performs all the Modelsim steps needed for a functional simulation. If an experiment had a simulation, there will be `sim/` directory in the experiment folder. This directory contains two files (minimum):
@@ -41,3 +43,5 @@ The Makefile option `simulate` performs all the Modelsim steps needed for a func
 To recreate the simulation, you need to modify the Makefile to have all the Verilog modules being stimulated in the `vlog` line (there is a comment in the Makefile to flag this). This allows Modelsim to compile the files you want to sim. Simply append the location of the Verilog files to the end of this line (after the testbench).
 ### Cleaning
 To blast away all transients after running hardware or simulation targets, use the Makefile option `clean`. This is useful before checking files in on Git, and is required if you want to run a Makefile target multiple times in a row.
+
+Modelsim is required for the Makefile simulation target. Specifically, Modelsim-Altera Starter is being used for development.
