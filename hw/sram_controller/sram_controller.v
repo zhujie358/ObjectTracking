@@ -21,6 +21,9 @@ module sram_controller(
 	//////////// KEY //////////
 	input 		     [3:0]		KEY,
 
+	//////////// SW //////////
+	input 		    [17:0]		SW,	
+
 	//////////// SRAM //////////
 	output		    [19:0]		SRAM_ADDR,
 	output		          		SRAM_CE_N,
@@ -31,6 +34,42 @@ module sram_controller(
 	output		          		SRAM_WE_N
 );
 
-assign LEDG = 9'b111111111;
+wire 		wen;
+wire [19:0] addr;
+wire [15:0] din;
+wire [15:0] dout;
+
+// Write data and address set by switches when KEY[1] is pressed
+assign din  = { 4'b0, SW[15:8]};
+assign addr = {12'b0, SW[ 7:0]};
+assign wen  = ~KEY[1];
+
+// SRAM Controller
+sram_wrapper sram_wrapper_inst
+(
+
+	// Clock and Reset
+	.clk 	 	(CLOCK_50),
+	.aresetn 	(KEY[0]),
+
+	// Wrapper Signals
+	.wen 		(wen),
+	.addr 		(addr),
+	.din		(din),
+	.dout 		(dout),
+
+	// SRAM Signals
+	.SRAM_ADDR 	(SRAM_ADDR),
+	.SRAM_CE_N 	(SRAM_CE_N),
+	.SRAM_DQ   	(SRAM_DQ),
+	.SRAM_LB_N 	(SRAM_LB_N),
+	.SRAM_OE_N 	(SRAM_OE_N),
+	.SRAM_UB_N 	(SRAM_UB_N),
+	.SRAM_WE_N 	(SRAM_WE_N)
+
+);
+
+// Read out the value at the address set by switches when KEY[2] is pressed
+assign LEDR[15:0] = ~KEY[2] ? dout : 'd0;
 
 endmodule
