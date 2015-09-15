@@ -15,6 +15,7 @@ Order | Name | Goal | Status
 
 ## Creating a New Experiment
 A new experiment (that works with the Makefile flow) can be created by following these steps:
+
 1. Create a new folder with the name of your experiment (no spaces).
 2. Open the "Terasic DE2-115 System Builder" program (can be downloaded from the Terasic website), type the experiment name into the "Project Name" text box, choose the peripherals needed for the experiment, and press "Generate".
 3. Navigate through the "CodeGenerated" directory produced by the program and find your experiment. Copy the QSF, Verilog, and SDC files into the folder created in step 1. If you'd like to work with Quartus in GUI mode, copy the QPF file as well.
