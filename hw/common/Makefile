@@ -52,6 +52,7 @@ hw_all:
 
 simulate:
 	vlib  work
-	vlog  ./sim/testbench.v ./*.v 
+	# Append other Verilog needed for sim in this line
+	vlog  ./sim/testbench.sv
 	modelsim -do sim/signals.do
 	touch simulate
