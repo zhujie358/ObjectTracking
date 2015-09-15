@@ -41,7 +41,9 @@ The Makefile option `simulate` performs all the Modelsim steps needed for a func
 2. A DO file containing the list of waveforms that will be displayed in Modelsim.
 
 To recreate the simulation, you need to modify the Makefile to have all the Verilog modules being stimulated in the `vlog` line (there is a comment in the Makefile to flag this). This allows Modelsim to compile the files you want to sim. Simply append the location of the Verilog files to the end of this line (after the testbench).
+
+Modelsim is required for the Makefile simulation target. Specifically, Modelsim-Altera Starter is being used for development.
+
 ### Cleaning
 To blast away all transients after running hardware or simulation targets, use the Makefile option `clean`. This is useful before checking files in on Git, and is required if you want to run a Makefile target multiple times in a row.
 
-Modelsim is required for the Makefile simulation target. Specifically, Modelsim-Altera Starter is being used for development.
