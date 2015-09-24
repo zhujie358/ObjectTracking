@@ -15,6 +15,10 @@ module video_input
 		output wire 		TD_RESET_N,
 		input wire 			TD_VS,
 
+		// Output Position
+		output wire [9:0]	pos_x,
+		output wire [9:0]	pos_y,
+
 		// Output RGB
 		output wire [9:0]	R_out,
 		output wire [9:0]	B_out,
@@ -39,6 +43,9 @@ wire 			YCbCr_valid_2;
 
 // TV Decoder Turned On
 assign	TD_RESET_N	=	1'b1;
+
+// Position Output
+assign pos_x = decoder_x;
 							
 //	ITU-R 656 to YUV 4:2:2
 ITU_656_Decoder	u4	
@@ -51,6 +58,7 @@ ITU_656_Decoder	u4
 	.iSkip 			(Remain==4'h0),
 
 	.oTV_X 			(decoder_x),
+	.oTV_Y 			(pos_y),
 	.oYCbCr 		(YCbCr),
 	.oDVAL 			(YCbCr_valid_1)
 );
