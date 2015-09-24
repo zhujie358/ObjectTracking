@@ -455,4 +455,5 @@ set_global_assignment -name VERILOG_FILE ../common/video_input/MAC_3.v
 set_global_assignment -name VERILOG_FILE ../common/video_input/ITU_656_Decoder.v
 set_global_assignment -name VERILOG_FILE ../common/video_input/DIV.v
 set_global_assignment -name VERILOG_FILE ../common/vga_sync.v
+set_global_assignment -name VERILOG_FILE ../common/sram_wrapper.v
 set_global_assignment -name SDC_FILE 	 new_pipeline_2.SDC

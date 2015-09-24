@@ -67,6 +67,9 @@ module new_pipeline_2(
 	output		          		SRAM_WE_N
 );
 
+// VGA Operating Frequency of 60Hz = 450000 cycles at 27MHz
+localparam CYCLE_PER_FRAME 		= 450000;
+
 // Input Resolution Parameters (units: pixels)
 localparam NTSC_RES_H 	   		= 720;
 
@@ -96,6 +99,8 @@ wire	[9:0]	Red; 				// RGB data after YCbCr conversion
 wire	[9:0]	Green;				// RGB data after YCbCr conversion
 wire	[9:0]	Blue;				// RGB data after YCbCr conversion
 wire			RGB_valid; 			// Valid RGB data after YCbCr conversion, unused
+wire    [9:0]	tv_x;				// Video input position info
+wire    [9:0]	tv_y;				// Video input position info
 
 // Field Select
 wire [15:0] 	rgb_packed_write;	// SDRAM write data
@@ -105,9 +110,19 @@ wire [15:0] 	rgb_packed_even;	// SDRAM data even field
 wire			vga_odd_ready;		// VGA data request odd field
 wire			vga_even_ready;		// VGA data request even field
 
+// Base Frame Latching
+wire			latch_baseframe;
+wire  			latch_singleframe;
+reg  [19:0] 	latch_timer;
+
+// SRAM Signals
+wire 			sram_wen;
+wire 			sram_address;
+wire [15:0]		sram_output;
+
 // VGA Controller Output
-wire	[10:0]	vga_x;				// VGA position, used in 422:444 converter
-wire	[10:0]	vga_y;				// VGA vertical position, used to determine odd or even field
+wire [10:0]		vga_x;				// VGA horizontal position
+wire [10:0]		vga_y;				// VGA vertical position
 wire			vga_ready;			// VGA data request
 
 // Reset to Key
@@ -124,6 +139,10 @@ video_input video_input_inst
 	.TD_HS 			(TD_HS),
 	.TD_RESET_N 	(TD_RESET_N),
 	.TD_VS 			(TD_VS),
+
+	// Position Data
+	.pos_x(tv_x),
+	.pos_y(tv_y),
 
 	// RGB
 	.R_out 			(Red), 
@@ -143,20 +162,20 @@ Sdram_Control_4Port	sdram_control_inst
 
 	//	FIFO Write Side 1
 	.WR1_DATA 		(rgb_packed_write),
-	.WR1 			(RGB_valid), 					// Write Enable
-	.WR1_ADDR 		(0),							// Base address
-	.WR1_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END),	// Store every pixel of every line. Blanking lines, odd lines, blanking lines, and even lines.
-	.WR1_LENGTH 	(9'h80), 						// The valid signal drops low every 8 samples, 16*8 = 128 bits per burst?
-	.WR1_LOAD 		(~aresetn), 				// Clears FIFO
+	.WR1 			(RGB_valid), 						// Write Enable
+	.WR1_ADDR 		(0),								// Base address
+	.WR1_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END),		// Store every pixel of every line. Blanking lines, odd lines, blanking lines, and even lines.
+	.WR1_LENGTH 	(9'h80), 							// The valid signal drops low every 8 samples, 16*8 = 128 bits per burst?
+	.WR1_LOAD 		(~aresetn), 						// Clears FIFO
 	.WR1_CLK 		(TD_CLK27),
 
 	 // FIFO Read Side 1 (Odd Field, Bypass Blanking)
     .RD1_DATA 		(rgb_packed_odd),
-	.RD1 			(vga_odd_ready), 					 // Read Enable
+	.RD1 			(vga_odd_ready), 					// Read Enable
 	.RD1_ADDR 		(VGA_RES_H_ACT*LINES_ODD_START), 	// Bypass the blanking lines
 	.RD1_MAX_ADDR 	(VGA_RES_H_ACT*LINES_ODD_END  ),	// Read out of the valid odd lines
 	.RD1_LENGTH 	(9'h80),  							// Just being consistent with write length?
-	.RD1_LOAD 		(~aresetn),   				// Clears FIFO
+	.RD1_LOAD 		(~aresetn),   						// Clears FIFO
 	.RD1_CLK 		(TD_CLK27),
 
 	// FIFO Read Side 2 (Even Field, Bypass Blanking)
@@ -165,7 +184,7 @@ Sdram_Control_4Port	sdram_control_inst
 	.RD2_ADDR 		(VGA_RES_H_ACT*LINES_EVEN_START),	// Bypass the blanking lines
 	.RD2_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END  ),	// Read out of the valid even lines
 	.RD2_LENGTH 	(9'h80),            				// Just being consistent with write length?
-	.RD2_LOAD 		(~aresetn),   				// Clears FIFO
+	.RD2_LOAD 		(~aresetn),   						// Clears FIFO
 	.RD2_CLK  		(TD_CLK27),
 
 	// SDRAM
@@ -179,6 +198,42 @@ Sdram_Control_4Port	sdram_control_inst
     .DQ 			(DRAM_DQ),
     .DQM 			({DRAM_DQM[1], DRAM_DQM[0]}),
 	.SDR_CLK 		(DRAM_CLK)	
+);
+
+// Base Frame Latching
+assign latch_baseframe   = ~KEY[1];
+assign latch_singleframe = (latch_baseframe & latch_timer < CYCLE_PER_FRAME);
+
+always @(posedge TD_CLK27 or negedge aresetn) begin
+	if (~aresetn)												latch_timer <= 'd0;
+	else if (latch_baseframe & latch_timer < CYCLE_PER_FRAME)	latch_timer <= latch_timer + 1;
+	else														latch_timer <= latch_timer;
+end
+
+// SRAM Controller
+assign sram_wen   	= RGB_valid & latch_singleframe;
+assign sram_address = sram_wen ? {tv_y[9:0], tv_x[9:0]} : {vga_y[9:0], vga_x[9:0]};
+
+sram_wrapper sram_wrapper_inst
+(
+	// Clock and Reset
+	.clk 	 	(TD_CLK27),
+	.aresetn 	(aresetn),
+
+	// Wrapper Signals
+	.wen 		(sram_wen),
+	.addr 		(sram_address),
+	.din		(SW[15:0]),
+	.dout 		(sram_output),
+
+	// SRAM Signals
+	.SRAM_ADDR 	(SRAM_ADDR),
+	.SRAM_CE_N 	(SRAM_CE_N),
+	.SRAM_DQ   	(SRAM_DQ),
+	.SRAM_LB_N 	(SRAM_LB_N),
+	.SRAM_OE_N 	(SRAM_OE_N),
+	.SRAM_UB_N 	(SRAM_UB_N),
+	.SRAM_WE_N 	(SRAM_WE_N)
 );
 
 // Field Select Logic (Odd/Even)
@@ -208,9 +263,9 @@ vga_sync #(
 	.aresetn 		(aresetn),
 
 	// Input Data
-	.R_in 			({rgb_packed_read[15:11], 5'b00000}),
-	.G_in 			({rgb_packed_read[10: 5], 4'b0000 }),
-	.B_in 			({rgb_packed_read[ 4: 0], 5'b00000}),
+	.R_in 			((latch_baseframe & ~latch_singleframe) ? {sram_output[15:11], 5'b00000} : {rgb_packed_read[15:11], 5'b00000}),
+	.G_in 			((latch_baseframe & ~latch_singleframe) ? {sram_output[10: 5], 4'b0000 } : {rgb_packed_read[10: 5], 4'b0000 }),
+	.B_in 			((latch_baseframe & ~latch_singleframe) ? {sram_output[ 4: 0], 5'b00000} : {rgb_packed_read[ 4: 0], 5'b00000}),
 
 	// Output Control Logic
 	.current_x 		(vga_x),
@@ -227,5 +282,9 @@ vga_sync #(
 	.blank_n		(VGA_BLANK_N),
 	.sync_n			(VGA_SYNC_N)
 );
+
+// Debug
+assign LEDG[0] = latch_singleframe;
+assign LEDG[1] = sram_wen;
 
 endmodule
