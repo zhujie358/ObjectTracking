@@ -1,4 +1,3 @@
-vlog ./testbench.v ./rgb_to_grayscale.v
 vsim -t 1ns -voptargs=+acc -L work testbench
 
 #Add the waveforms you want to see here
