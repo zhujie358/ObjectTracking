@@ -13,6 +13,7 @@ Order | Name | Goal | Status
 3 | `new_pipeline`| Modify the pipeline from the previous experiment such that the SDRAM frame buffer holds RGB pixel data instead of YCbCr.| Complete
 4 | `sram_controller`| Write a wrapper module to abstract the DE2 SRAM signals as a simple RAM block (i.e. write enable, data in, data out, address). Test in functional simulation to ensure the signals match the data sheet, and test in hardware using some random values and the LEDs to verify.| Complete
 5 | `rgb_to_grayscale`| Write a Verilog module that implements the RGB to grayscale equation from software. Scale the colour coefficients to their fixed point values. Test in functional simulation to ensure equation works properly.| Complete
+6 | `new_pipeline_2` | Integrate the SRAM controller and the RGB to grayscale modules into the video pipeline. The goal is to latch a specific frame using a button on the DE2, and store that frame in the SRAM. Then, the RGB to grayscale module will be used to produce the delta frame on the VGA display. | In progress
 
 ## Creating a New Experiment
 A new experiment (that works with the Makefile flow) can be created by following these steps:
