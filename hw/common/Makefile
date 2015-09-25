@@ -1,4 +1,4 @@
-EXP_NAME = sram_controller
+EXP_NAME = new_pipeline_2
 
 make all:
 	@echo "------------ TARGETS ------------"

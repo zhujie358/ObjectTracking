@@ -111,13 +111,9 @@ wire			vga_odd_ready;		// VGA data request odd field
 wire			vga_even_ready;		// VGA data request even field
 
 // Base Frame Latching
-wire			latch_baseframe;
-wire  			latch_singleframe;
-reg  [19:0] 	latch_timer;
+reg 			hold_frame;
 
-// SRAM Signals
-wire 			sram_wen;
-wire 			sram_address;
+// Base Frame SRAM
 wire [15:0]		sram_output;
 
 // VGA Controller Output
@@ -201,19 +197,13 @@ Sdram_Control_4Port	sdram_control_inst
 );
 
 // Base Frame Latching
-assign latch_baseframe   = ~KEY[1];
-assign latch_singleframe = (latch_baseframe & latch_timer < CYCLE_PER_FRAME);
-
 always @(posedge TD_CLK27 or negedge aresetn) begin
-	if (~aresetn)												latch_timer <= 'd0;
-	else if (latch_baseframe & latch_timer < CYCLE_PER_FRAME)	latch_timer <= latch_timer + 1;
-	else														latch_timer <= latch_timer;
-end
+	if (~aresetn) 		hold_frame <= 1'b0;
+	else if (~KEY[1])	hold_frame <= 1'b1;
+	else				hold_frame <= hold_frame;
+end 
 
 // SRAM Controller
-assign sram_wen   	= RGB_valid & latch_singleframe;
-assign sram_address = sram_wen ? {tv_y[9:0], tv_x[9:0]} : {vga_y[9:0], vga_x[9:0]};
-
 sram_wrapper sram_wrapper_inst
 (
 	// Clock and Reset
@@ -221,9 +211,9 @@ sram_wrapper sram_wrapper_inst
 	.aresetn 	(aresetn),
 
 	// Wrapper Signals
-	.wen 		(sram_wen),
-	.addr 		(sram_address),
-	.din		(SW[15:0]),
+	.wen 		(~KEY[1]),
+	.addr 		({vga_x[9:0], vga_y[9:0]}),
+	.din		(rgb_packed_read),
 	.dout 		(sram_output),
 
 	// SRAM Signals
@@ -263,9 +253,9 @@ vga_sync #(
 	.aresetn 		(aresetn),
 
 	// Input Data
-	.R_in 			((latch_baseframe & ~latch_singleframe) ? {sram_output[15:11], 5'b00000} : {rgb_packed_read[15:11], 5'b00000}),
-	.G_in 			((latch_baseframe & ~latch_singleframe) ? {sram_output[10: 5], 4'b0000 } : {rgb_packed_read[10: 5], 4'b0000 }),
-	.B_in 			((latch_baseframe & ~latch_singleframe) ? {sram_output[ 4: 0], 5'b00000} : {rgb_packed_read[ 4: 0], 5'b00000}),
+	.R_in 			(hold_frame ? {sram_output[15:11], 5'b00000} : {rgb_packed_read[15:11], 5'b00000}),
+	.G_in 			(hold_frame ? {sram_output[10: 5], 4'b0000 } : {rgb_packed_read[10: 5], 4'b0000 }),
+	.B_in 			(hold_frame ? {sram_output[ 4: 0], 5'b00000} : {rgb_packed_read[ 4: 0], 5'b00000}),
 
 	// Output Control Logic
 	.current_x 		(vga_x),
@@ -282,9 +272,5 @@ vga_sync #(
 	.blank_n		(VGA_BLANK_N),
 	.sync_n			(VGA_SYNC_N)
 );
-
-// Debug
-assign LEDG[0] = latch_singleframe;
-assign LEDG[1] = sram_wen;
 
 endmodule
