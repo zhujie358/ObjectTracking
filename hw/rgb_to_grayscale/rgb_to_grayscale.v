@@ -1,46 +1,54 @@
+////////////////////////////////////////////////////////////////
+// File:   rgb_to_grayscale.v
+// Author: T. Dotsikas, B. Brown
+// About:  Fixed point RGB to grayscale conversion.
+////////////////////////////////////////////////////////////////
+
 `timescale 1ns/1ns
 
-module rgb_to_grayscale(
-
+module rgb_to_grayscale #(
+	parameter rgb_width = 10
+)(
 	//////////// CLOCK //////////
-	input 		          		clk,
+	input 		          					clk,
 
 	//////////// DATA ///////////
-	input wire		    [4:0]		RED,
-	input wire			[5:0]		GREEN,
-	input wire			[4:0]		BLUE,
-	output wire 		[11:0]		GRAYSCALE,
+	input wire		    [(rgb_width-1):0]	RED,
+	input wire			[(rgb_width-1):0]	GREEN,
+	input wire			[(rgb_width-1):0]	BLUE,
+	output wire 		[(rgb_width-1):0]	GRAYSCALE,
 
 	//////////// CONTROL ///////////
-	input						valid_in,
-	input						aresetn,
-	output						valid_out
-
+	input									valid_in,
+	input									aresetn,
+	output									valid_out
 );
 
-//R: 31*14 = 434
-//G: 63*46 = 2898
-//B: 31*5 = 155
-//SUM = 3487 = 12 BITS to hold the maximum value of the max rgb combination
-localparam red_coeff   = 14;
-localparam green_coeff = 46;
-localparam blue_coeff  = 155; 
+// RGB-Grayscale Coefficients (See Wikipedia)
+localparam frac_width  = 6;
+localparam fixed_width = frac_width + rgb_width;
+localparam red_coeff   = 13; // floor(.2126 << 6)
+localparam green_coeff = 45; // floor(.7152 << 6)
+localparam blue_coeff  = 4;  // floor(.0722 << 6)
 
-//=======================================================
-//  REG/WIRE declarations
-//=======================================================
+// Internal signals
+reg [(fixed_width-1):0] int_gray;
+reg 	   			  	int_valid_out;
 
-reg [11:0] int_gray;
-reg 	   int_valid_out;
+// Slice fractional portion of grayscale (i.e. rounding)
+assign GRAYSCALE = int_gray[(fixed_width-1):frac_width];
 
-assign GRAYSCALE = int_gray;
+// Wire to reg
 assign valid_out = int_valid_out;
 
+// Apply equation when valid data is available
 always @(posedge clk or negedge aresetn) begin
-	if (~aresetn) 	int_gray <= 0;
-	else 			int_gray <= red_coeff*RED + green_coeff*GREEN + blue_coeff*BLUE;
+	if (~aresetn) 		int_gray <= 0;
+	else if (valid_in)	int_gray <= red_coeff*RED + green_coeff*GREEN + blue_coeff*BLUE;
+	else 				int_gray <= int_gray;
 end
 
+// Flop the valid signal
 always @(posedge clk or negedge aresetn) begin
 	if (~aresetn) 	int_valid_out <= 0;
 	else 			int_valid_out <= valid_in;

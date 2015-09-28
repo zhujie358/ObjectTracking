@@ -67,6 +67,18 @@ module new_pipeline_2(
 	output		          		SRAM_WE_N
 );
 
+// VGA Display Width
+localparam DISP_WIDTH 			= 11;
+
+// Color Width
+localparam COLOR_WIDTH 			= 10;
+
+// SDRAM and SRAM Data Width
+localparam RAM_WIDTH 			= 16;
+
+// Pad bits needed for memory
+localparam PAD_BITS 			= RAM_WIDTH - COLOR_WIDTH;
+
 // VGA Operating Frequency of 60Hz = 450000 cycles at 27MHz
 localparam CYCLE_PER_FRAME 		= 450000;
 
@@ -95,31 +107,32 @@ localparam LINES_EVEN_END   	= LINES_EVEN_START + VGA_RES_V_ACT_2;
 wire 			aresetn;
 
 // TV Decode Pipeline Output
-wire	[9:0]	Red; 				// RGB data after YCbCr conversion
-wire	[9:0]	Green;				// RGB data after YCbCr conversion
-wire	[9:0]	Blue;				// RGB data after YCbCr conversion
-wire			RGB_valid; 			// Valid RGB data after YCbCr conversion, unused
-wire    [9:0]	tv_x;				// Video input position info
-wire    [9:0]	tv_y;				// Video input position info
+wire [(COLOR_WIDTH-1):0]	Red; 				// RGB data after YCbCr conversion
+wire [(COLOR_WIDTH-1):0]	Green;				// RGB data after YCbCr conversion
+wire [(COLOR_WIDTH-1):0]	Blue;				// RGB data after YCbCr conversion
+wire						RGB_valid; 			// Valid RGB data after YCbCr conversion, unused
 
-// Field Select
-wire [15:0] 	rgb_packed_write;	// SDRAM write data
-wire [15:0] 	rgb_packed_read;	// SDRAM read data muxed for odd or even field
-wire [15:0] 	rgb_packed_odd;		// SDRAM data odd field
-wire [15:0] 	rgb_packed_even;	// SDRAM data even field
-wire			vga_odd_ready;		// VGA data request odd field
-wire			vga_even_ready;		// VGA data request even field
+// RGB to Grayscale Converter
+wire [(COLOR_WIDTH-1):0]	grayscale;
+wire 						grayscale_valid;
 
-// Base Frame Latching
-reg 			hold_frame;
+// Curr Frame SDRAM
+wire [(RAM_WIDTH-1):0] 		sdram_output;		// SDRAM read data muxed for odd or even field
+wire [(RAM_WIDTH-1):0] 		grayscale_odd;		// SDRAM data odd field
+wire [(RAM_WIDTH-1):0] 		grayscale_even;		// SDRAM data even field
+wire						vga_odd_ready;		// VGA data request odd field
+wire						vga_even_ready;		// VGA data request even field
 
 // Base Frame SRAM
-wire [15:0]		sram_output;
+wire [(RAM_WIDTH-1):0]		sram_output;
+
+// Delta Frame Generator
+wire [(COLOR_WIDTH-1):0]	delta_frame;
 
 // VGA Controller Output
-wire [10:0]		vga_x;				// VGA horizontal position
-wire [10:0]		vga_y;				// VGA vertical position
-wire			vga_ready;			// VGA data request
+wire [(DISP_WIDTH-1):0]		vga_x;				// VGA horizontal position
+wire [(DISP_WIDTH-1):0]		vga_y;				// VGA vertical position
+wire						vga_ready;			// VGA data request
 
 // Reset to Key
 assign aresetn = KEY[0];
@@ -136,10 +149,6 @@ video_input video_input_inst
 	.TD_RESET_N 	(TD_RESET_N),
 	.TD_VS 			(TD_VS),
 
-	// Position Data
-	.pos_x(tv_x),
-	.pos_y(tv_y),
-
 	// RGB
 	.R_out 			(Red), 
 	.B_out 			(Blue),
@@ -147,8 +156,23 @@ video_input video_input_inst
 	.RGB_valid  	(RGB_valid)
 );
 
-// RGB 30-bit to RGB 16-bit
-assign rgb_packed_write = {Red[9:5], Green[9:4], Blue[9:5]};
+// RGB 30-bit convertered to 10-bit grayscale
+rgb_to_grayscale #(
+	.rgb_width		(COLOR_WIDTH)
+) conv_rgb_to_gray (
+	.clk 			(TD_CLK27),
+	.aresetn 		(aresetn),
+
+	// Input Data Bus
+	.RED 			(Red),
+	.GREEN			(Green),
+	.BLUE			(Blue),
+	.valid_in		(RGB_valid),
+
+	// Output Data Bus
+	.GRAYSCALE 		(grayscale),
+	.valid_out		(grayscale_valid)
+);
 
 //	SDRAM Frame Buffer
 Sdram_Control_4Port	sdram_control_inst	
@@ -157,8 +181,8 @@ Sdram_Control_4Port	sdram_control_inst
     .RESET_N 		(aresetn),
 
 	//	FIFO Write Side 1
-	.WR1_DATA 		(rgb_packed_write),
-	.WR1 			(RGB_valid), 						// Write Enable
+	.WR1_DATA 		({{PAD_BITS{1'b0}}, grayscale}),
+	.WR1 			(grayscale_valid), 					// Write Enable
 	.WR1_ADDR 		(0),								// Base address
 	.WR1_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END),		// Store every pixel of every line. Blanking lines, odd lines, blanking lines, and even lines.
 	.WR1_LENGTH 	(9'h80), 							// The valid signal drops low every 8 samples, 16*8 = 128 bits per burst?
@@ -166,7 +190,7 @@ Sdram_Control_4Port	sdram_control_inst
 	.WR1_CLK 		(TD_CLK27),
 
 	 // FIFO Read Side 1 (Odd Field, Bypass Blanking)
-    .RD1_DATA 		(rgb_packed_odd),
+    .RD1_DATA 		(grayscale_odd),
 	.RD1 			(vga_odd_ready), 					// Read Enable
 	.RD1_ADDR 		(VGA_RES_H_ACT*LINES_ODD_START), 	// Bypass the blanking lines
 	.RD1_MAX_ADDR 	(VGA_RES_H_ACT*LINES_ODD_END  ),	// Read out of the valid odd lines
@@ -175,7 +199,7 @@ Sdram_Control_4Port	sdram_control_inst
 	.RD1_CLK 		(TD_CLK27),
 
 	// FIFO Read Side 2 (Even Field, Bypass Blanking)
-    .RD2_DATA 		(rgb_packed_even),
+    .RD2_DATA 		(grayscale_even),
 	.RD2 			(vga_even_ready),					// Read Enable
 	.RD2_ADDR 		(VGA_RES_H_ACT*LINES_EVEN_START),	// Bypass the blanking lines
 	.RD2_MAX_ADDR 	(VGA_RES_H_ACT*LINES_EVEN_END  ),	// Read out of the valid even lines
@@ -196,12 +220,10 @@ Sdram_Control_4Port	sdram_control_inst
 	.SDR_CLK 		(DRAM_CLK)	
 );
 
-// Base Frame Latching
-always @(posedge TD_CLK27 or negedge aresetn) begin
-	if (~aresetn) 		hold_frame <= 1'b0;
-	else if (~KEY[1])	hold_frame <= 1'b1;
-	else				hold_frame <= hold_frame;
-end 
+// Field Select Logic (Odd/Even)
+assign	vga_odd_ready	= vga_y[0]  ? 1'b0	 			:  vga_ready;
+assign	vga_even_ready	= vga_y[0]  ? vga_ready  		:  1'b0;
+assign	sdram_output	= ~vga_y[0] ? grayscale_odd		:  grayscale_even;
 
 // SRAM Controller
 sram_wrapper sram_wrapper_inst
@@ -213,7 +235,7 @@ sram_wrapper sram_wrapper_inst
 	// Wrapper Signals
 	.wen 		(~KEY[1]),
 	.addr 		({vga_x[9:0], vga_y[9:0]}),
-	.din		(rgb_packed_read),
+	.din		(sdram_output),
 	.dout 		(sram_output),
 
 	// SRAM Signals
@@ -226,15 +248,27 @@ sram_wrapper sram_wrapper_inst
 	.SRAM_WE_N 	(SRAM_WE_N)
 );
 
-// Field Select Logic (Odd/Even)
-assign	vga_odd_ready	= vga_y[0]  ? 1'b0	 			:  vga_ready;
-assign	vga_even_ready	= vga_y[0]  ? vga_ready  		:  1'b0;
-assign	rgb_packed_read	= ~vga_y[0] ? rgb_packed_odd	:  rgb_packed_even;
+delta_frame #(
+	.INPUT_WIDTH (COLOR_WIDTH)
+) delta_frame_inst (
+	
+	// Control
+	.clk 			(TD_CLK27),
+	.aresetn		(aresetn),
+	.enable 		(SW[0]),
+
+	// Input Data
+	.base_frame     (sram_output [(COLOR_WIDTH-1):0]),
+	.curr_frame     (sdram_output[(COLOR_WIDTH-1):0]),
+
+	// Output Data
+	.delta_frame    (delta_frame)
+);
 
 //	VGA Controller
 vga_sync #(
-	.H_TOTAL_WIDTH 	(11),
-	.V_TOTAL_WIDTH 	(11),
+	.H_TOTAL_WIDTH 	(DISP_WIDTH),
+	.V_TOTAL_WIDTH 	(DISP_WIDTH),
 
 	.POLARITY 		(VGA_RES_POLAR),
 
@@ -253,9 +287,9 @@ vga_sync #(
 	.aresetn 		(aresetn),
 
 	// Input Data
-	.R_in 			(hold_frame ? {sram_output[15:11], 5'b00000} : {rgb_packed_read[15:11], 5'b00000}),
-	.G_in 			(hold_frame ? {sram_output[10: 5], 4'b0000 } : {rgb_packed_read[10: 5], 4'b0000 }),
-	.B_in 			(hold_frame ? {sram_output[ 4: 0], 5'b00000} : {rgb_packed_read[ 4: 0], 5'b00000}),
+	.R_in 			(delta_frame),
+	.G_in 			(delta_frame),
+	.B_in 			(delta_frame),
 
 	// Output Control Logic
 	.current_x 		(vga_x),
