@@ -255,7 +255,9 @@ delta_frame #(
 	// Control
 	.clk 			(TD_CLK27),
 	.aresetn		(aresetn),
-	.enable 		(SW[0]),
+	.enable 		(SW[17]),
+
+	.threshold(SW[9:0]),
 
 	// Input Data
 	.base_frame     (sram_output [(COLOR_WIDTH-1):0]),
