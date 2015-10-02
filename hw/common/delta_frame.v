@@ -12,6 +12,7 @@ module delta_frame #(
 	input wire 						aresetn,
 	input wire 						enable,
 
+	// Filter
 	input wire [(INPUT_WIDTH-1):0]	threshold,
 
 	// Input Data
@@ -25,7 +26,7 @@ module delta_frame #(
 // Internal Signals
 reg [(INPUT_WIDTH-1):0] int_delta_frame;
 
-// Wrapper for the register
+// Add saturation logic (constant threshold filter)
 assign delta_frame = enable ? ((int_delta_frame > threshold) ? {INPUT_WIDTH{1'b1}} : {INPUT_WIDTH{1'b0}}) : int_delta_frame;
 
 always @(posedge clk or negedge aresetn) begin
