@@ -257,7 +257,11 @@ delta_frame #(
 	.aresetn		(aresetn),
 	.enable 		(SW[17]),
 
-	.threshold(SW[9:0]),
+	// For Moving Average Filter
+	.is_not_blank	(vga_ready),
+
+	// For Saturation Filter
+	.threshold 		(SW[(COLOR_WIDTH-1):0]),
 
 	// Input Data
 	.base_frame     (sram_output [(COLOR_WIDTH-1):0]),
