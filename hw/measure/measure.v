@@ -91,10 +91,9 @@ always @(posedge clk or negedge aresetn) begin
 		end
 	else 
 		begin
-			x_counter <= x_counter;
+			x_counter <= x_counter + 1;
 			y_counter <= y_counter;
 		end
-
-	x_counter <= x_counter + 1; 
 end
+
 endmodule
