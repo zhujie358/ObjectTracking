@@ -18,7 +18,7 @@ module measure #(
 	output wire		[26:0]					y_position,
 
 	//////////// CONTROL ///////////
-	input wire									aresetn,
+	input wire								aresetn,
 	output wire								valid_position
 );
 
@@ -31,7 +31,6 @@ reg [(INPUT_WIDTH-1):0]		y_counter; //Keep track of what y value comes in
 //Internal Coordinates
 reg [26:0]					int_x_position;
 reg [26:0]					int_y_position;
-
 reg 						int_valid_position;
 
 assign x_position = int_x_position; //Have to get rid of some bits
@@ -46,6 +45,8 @@ always @(posedge clk or negedge aresetn) begin
 			y_coordinate_sum <= 'd0;
 			x_counter <= 'd0;
 			y_counter <= 'd0;
+			int_x_position <= 'd0;
+			int_y_position <= 'd0;
 		end
 	else if (&delta_frame)
 		begin
