@@ -314,14 +314,12 @@ color_position #(
 	.x_pos 			(vga_x),
 	.y_pos 			(vga_y),
 
-	// Input Data: From Measure
+	// Input Data: From measure
 	.x_obj 			(x_object),
 	.y_obj 			(y_object),
 
-	// Input Data: From Delta Frame	
-	.red 			(delta_frame),
-	.green 			(delta_frame),
-	.blue 			(delta_frame),
+	// Input Data: Regular video stream
+	.curr 			(sdram_output[(COLOR_WIDTH-1):0]),
 
 	// Output Data: To VGA
 	.r_out 			(red_out),

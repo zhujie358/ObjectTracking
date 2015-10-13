@@ -8,20 +8,23 @@ module color_position # (
 	parameter COLOR_WIDTH = 10,
 	parameter DISP_WIDTH  = 11
 )(
+	// Control
 	input wire clk, 
 	input wire aresetn,
 	input wire enable,
 
-	input wire [(COLOR_WIDTH-1):0] red,
-	input wire [(COLOR_WIDTH-1):0] green,
-	input wire [(COLOR_WIDTH-1):0] blue,
+	// Regular Video Data
+	input wire [(COLOR_WIDTH-1):0] curr,
 
+	// VGA Position
 	input wire [(DISP_WIDTH-1):0] x_pos,
 	input wire [(DISP_WIDTH-1):0] y_pos,
 
+	// Center of Object
 	input wire [(DISP_WIDTH-1):0] x_obj,
 	input wire [(DISP_WIDTH-1):0] y_obj,
 
+	// Output Data
 	output wire [(COLOR_WIDTH-1):0] r_out,
 	output wire [(COLOR_WIDTH-1):0] g_out,
 	output wire [(COLOR_WIDTH-1):0] b_out
@@ -49,10 +52,11 @@ assign vga_is_object = (x_diff < THRESHOLD) & (y_diff < THRESHOLD);
 
 // Drive RGB to red if the above point is near the object
 always @(posedge clk or negedge aresetn) begin
-
 	if (~aresetn)
 		begin
-
+			int_r_out <= 'd0;
+			int_g_out <= 'd0;
+			int_b_out <= 'd0;			
 		end
 	else if (enable & vga_is_object)
 		begin
@@ -62,9 +66,9 @@ always @(posedge clk or negedge aresetn) begin
 		end
 	else
 		begin
-			int_r_out <= red;
-			int_g_out <= green;
-			int_b_out <= blue;
+			int_r_out <= curr;
+			int_g_out <= curr;
+			int_b_out <= curr;
 		end
 end
 
