@@ -43,10 +43,6 @@ always @(posedge clk or negedge aresetn) begin
 			total_count <= 'd0;
 			x_coordinate_sum <= 'd0;
 			y_coordinate_sum <= 'd0;
-			x_counter <= 'd0;
-			y_counter <= 'd0;
-			int_x_position <= 'd0;
-			int_y_position <= 'd0;
 		end
 	else if (&delta_frame)
 		begin
@@ -59,17 +55,16 @@ always @(posedge clk or negedge aresetn) begin
 			total_count <= total_count;
 			x_coordinate_sum <= x_coordinate_sum;
 			y_coordinate_sum <= y_coordinate_sum;
-			x_counter <= x_counter;
-			y_counter <= y_counter;
-
 		end
-	x_counter <= x_counter + 1; // this line is suspect
 end
 
-//Go to the next row - maybe move all x_counter, y_counter assignments here?
-
 always @(posedge clk or negedge aresetn) begin
-	if (x_counter == 640 && y_counter == 480)
+	if (~aresetn)
+		begin
+			int_x_position <= 'd0;
+			int_y_position <= 'd0;
+		end	
+	else if (x_counter == 640 && y_counter == 480)
 		begin
 			int_valid_position <= 1;
 			int_x_position <= x_coordinate_sum/total_count; 
@@ -84,11 +79,22 @@ always @(posedge clk or negedge aresetn) begin
 end
 
 always @(posedge clk or negedge aresetn) begin
-if (x_counter == 641)
-	begin
-		x_counter <= 'd0;
-		y_counter <= y_counter + 1;
-	end
-end
+	if (~aresetn)
+		begin
+			x_counter <= 'd0;
+			y_counter <= 'd0;
+		end
+	else if (x_counter == 641)
+		begin
+			x_counter <= 'd0;
+			y_counter <= y_counter + 1;
+		end
+	else 
+		begin
+			x_counter <= x_counter;
+			y_counter <= y_counter;
+		end
 
+	x_counter <= x_counter + 1; 
+end
 endmodule
