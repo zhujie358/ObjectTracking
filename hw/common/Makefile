@@ -1,4 +1,4 @@
-EXP_NAME = new_pipeline_2
+EXP_NAME = measure_hw_verify
 
 make all:
 	@echo "------------ TARGETS ------------"
