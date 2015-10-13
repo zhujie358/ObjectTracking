@@ -10,6 +10,7 @@ module color_position # (
 )(
 	input wire clk, 
 	input wire aresetn,
+	input wire enable,
 
 	input wire [(COLOR_WIDTH-1):0] red,
 	input wire [(COLOR_WIDTH-1):0] green,
@@ -27,7 +28,7 @@ module color_position # (
 );
 
 // Internal Parameters
-localparam THRESHOLD = 3;
+localparam THRESHOLD = 20;
 
 // Internal Signals
 wire 					vga_is_object;
@@ -46,7 +47,6 @@ assign x_diff		 = (x_pos > x_obj) ? x_pos - x_obj : x_obj - x_pos;
 assign y_diff		 = (y_pos > y_obj) ? y_pos - y_obj : y_obj - y_pos;
 assign vga_is_object = (x_diff < THRESHOLD) & (y_diff < THRESHOLD);
 
-
 // Drive RGB to red if the above point is near the object
 always @(posedge clk or negedge aresetn) begin
 
@@ -54,7 +54,7 @@ always @(posedge clk or negedge aresetn) begin
 		begin
 
 		end
-	else if (vga_is_object)
+	else if (enable & vga_is_object)
 		begin
 			int_r_out <= {COLOR_WIDTH {1'b1}};
 			int_g_out <= {COLOR_WIDTH {1'b0}};

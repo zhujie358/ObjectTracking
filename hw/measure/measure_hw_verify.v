@@ -132,7 +132,6 @@ wire [(COLOR_WIDTH-1):0]	delta_frame;
 // Measure 
 wire [(DISP_WIDTH-1):0]		x_object;
 wire [(DISP_WIDTH-1):0]		y_object;
-wire						valid_object;
 
 // Color Position
 wire [(COLOR_WIDTH-1):0]	red_out;
@@ -283,19 +282,23 @@ delta_frame #(
 
 measure #(
 	.INPUT_WIDTH	(DISP_WIDTH),
-	.COLOR_WIDTH	(COLOR_WIDTH)
+	.COLOR_WIDTH	(COLOR_WIDTH),
+	.FRAME_X_MAX 	(VGA_RES_H_ACT),
+	.FRAME_Y_MAX 	(VGA_RES_V_ACT)
 ) measure_inst (
 	// Control
 	.clk 			(TD_CLK27),
 	.aresetn 		(aresetn),
+	.enable 		(SW[17]),
 
 	// Input Data
+	.vga_x 			(vga_x),
+	.vga_y 			(vga_y),
 	.delta_frame 	(delta_frame),
 
 	// Output Data
 	.x_position 	(x_object),
-	.y_position 	(y_object),
-	.valid_position (valid_object)
+	.y_position 	(y_object)
 );
 
 color_position #(
@@ -305,10 +308,11 @@ color_position #(
 	// Control
 	.clk 			(TD_CLK27),
 	.aresetn 		(aresetn),
+	.enable 		(SW[17]),
 
 	// Input Data: From VGA
-	.x_pos 			(x_position),
-	.y_pos 			(y_position),
+	.x_pos 			(vga_x),
+	.y_pos 			(vga_y),
 
 	// Input Data: From Measure
 	.x_obj 			(x_object),
@@ -347,9 +351,9 @@ vga_sync #(
 	.aresetn 		(aresetn),
 
 	// Input Data
-	.R_in 			(delta_frame),
-	.G_in 			(delta_frame),
-	.B_in 			(delta_frame),
+	.R_in 			(red_out),
+	.G_in 			(green_out),
+	.B_in 			(blue_out),
 
 	// Output Control Logic
 	.current_x 		(vga_x),
