@@ -5,7 +5,8 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 module delta_frame #(
-	parameter INPUT_WIDTH = 10
+	parameter INPUT_WIDTH = 10,
+	parameter DISP_WIDTH  = 11
 )(
 	// Control
 	input wire 						clk,
@@ -13,6 +14,9 @@ module delta_frame #(
 
 	// Moving Average Filter
 	input wire 						is_not_blank,
+
+	// Position hack for left side problem
+	input wire [(DISP_WIDTH-1):0]	x_pos,
 
 	// Saturation Filter
 	input wire [(INPUT_WIDTH-1):0]	threshold, 
@@ -27,6 +31,9 @@ module delta_frame #(
 
 // Moving Average Filter
 localparam FILTER_LENGTH = 5;
+
+// Position hack for left side problem
+localparam POS_MAX 		 = 620;
 
 // Internal Delta Result
 reg  [(INPUT_WIDTH-1):0] int_delta_frame;
@@ -46,6 +53,7 @@ assign delta_frame = ((avg[(INPUT_WIDTH-1):0] > threshold) ? {INPUT_WIDTH{1'b1}}
 
 always @(posedge clk or negedge aresetn) begin
 	if (~aresetn) 							int_delta_frame <= 'd0;
+	else if (x_pos > POS_MAX)				int_delta_frame <= 'd0;
 	else
 		begin
 			// Poor man's absolute value

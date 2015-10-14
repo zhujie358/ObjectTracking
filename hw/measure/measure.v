@@ -80,7 +80,7 @@ localparam RAM_WIDTH 			= 16;
 localparam PAD_BITS 			= RAM_WIDTH - COLOR_WIDTH;
 
 // Number of pixels to draw in each direction from the target
-localparam TARGET_SIZE 			= 20;
+localparam TARGET_SIZE 			= 10;
 
 // Output Resolution Parameters (units: pixels)
 localparam VGA_RES_POLAR   		= 1'b0; // HS and VS are active-low for these settings
@@ -265,6 +265,7 @@ sram_wrapper sram_wrapper_inst
 );
 
 delta_frame #(
+	.DISP_WIDTH   	(DISP_WIDTH),
 	.INPUT_WIDTH 	(COLOR_WIDTH)
 ) delta_frame_inst (
 	// Control
@@ -273,6 +274,9 @@ delta_frame #(
 
 	// For Moving Average Filter
 	.is_not_blank	(vga_ready),
+
+	// Position hack for left side problem
+	.x_pos 			(vga_x),
 
 	// For Saturation Filter
 	.threshold 		(sat_thresh),

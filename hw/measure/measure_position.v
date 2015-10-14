@@ -24,8 +24,7 @@ module measure_position #(
 
 	//////////// CONTROL ///////////
 	input wire								aresetn,
-	input wire								enable,
-	output wire								valid_position
+	input wire								enable
 );
 
 // Internal Signals (widths determined based on max x and y values)
@@ -36,11 +35,8 @@ reg [26:0]		   		y_coordinate_sum;
 // Wrappers
 reg [(INPUT_WIDTH-1):0]	int_x_position;
 reg [(INPUT_WIDTH-1):0]	int_y_position;
-reg 					int_valid_position;
 assign x_position     = int_x_position;
 assign y_position 	  = int_y_position;
-assign valid_position = int_valid_position;
-
 
 // These are the three values used in the algorithm
 always @(posedge clk or negedge aresetn) begin
@@ -86,27 +82,23 @@ always @(posedge clk or negedge aresetn) begin
 	// Reset
 	if (~aresetn)
 		begin
-			int_valid_position  <= 1'b0;
 			int_x_position      <= 'd0;
 			int_y_position      <= 'd0;
 		end	
 	// Enable
 	else if (~enable)
 		begin
-			int_valid_position  <= 1'b0;
 			int_x_position 	    <= 'd0;
 			int_y_position 	    <= 'd0;		
 		end
 	// Pulse result at end of frame
 	else if (vga_x == FRAME_X_MAX & vga_y == FRAME_Y_MAX)
 		begin
-			int_valid_position  <= 1'b1;
 			int_x_position 	    <= x_coordinate_sum / total_count; 
 			int_y_position 	    <= y_coordinate_sum / total_count;
 		end
 	else 
 		begin
-			int_valid_position  <= 1'b0;
 			int_x_position 		<= int_x_position;
 			int_y_position 		<= int_y_position;
 		end
