@@ -1,4 +1,4 @@
-EXP_NAME = measure_hw_verify
+EXP_NAME = measure
 
 make all:
 	@echo "------------ TARGETS ------------"

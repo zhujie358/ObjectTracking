@@ -4,14 +4,14 @@
 
 set_global_assignment -name FAMILY "Cyclone IV E"
 set_global_assignment -name DEVICE EP4CE115F29C7
-set_global_assignment -name TOP_LEVEL_ENTITY "measure_hw_verify"
+set_global_assignment -name TOP_LEVEL_ENTITY "measure"
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION "14.0"
 set_global_assignment -name LAST_QUARTUS_VERSION "14.0"
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "16:43:54 OCTOBER 13,2015"
 set_global_assignment -name DEVICE_FILTER_PACKAGE FBGA
 set_global_assignment -name DEVICE_FILTER_PIN_COUNT 780
 set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 7
-set_global_assignment -name SDC_FILE measure_hw_verify.SDC
+set_global_assignment -name SDC_FILE measure.SDC
 set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
 
 #============================================================
@@ -459,6 +459,5 @@ set_global_assignment -name VERILOG_FILE ../common/sram_wrapper.v
 set_global_assignment -name VERILOG_FILE ../common/delta_frame.v
 set_global_assignment -name VERILOG_FILE ../common/delta_divide.v
 set_global_assignment -name VERILOG_FILE ../common/rgb_to_grayscale.v
-set_global_assignment -name VERILOG_FILE measure.v
-set_global_assignment -name VERILOG_FILE color_position.v
-set_global_assignment -name SDC_FILE 	 measure_hw_verify.SDC
+set_global_assignment -name VERILOG_FILE ./measure_position.v
+set_global_assignment -name VERILOG_FILE ./color_position.v
