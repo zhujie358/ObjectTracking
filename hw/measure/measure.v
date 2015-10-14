@@ -79,11 +79,8 @@ localparam RAM_WIDTH 			= 16;
 // Pad bits needed for memory
 localparam PAD_BITS 			= RAM_WIDTH - COLOR_WIDTH;
 
-// VGA Operating Frequency of 60Hz = 450000 cycles at 27MHz
-localparam CYCLE_PER_FRAME 		= 450000;
-
-// Input Resolution Parameters (units: pixels)
-localparam NTSC_RES_H 	   		= 720;
+// Number of pixels to draw in each direction from the target
+localparam TARGET_SIZE 			= 20;
 
 // Output Resolution Parameters (units: pixels)
 localparam VGA_RES_POLAR   		= 1'b0; // HS and VS are active-low for these settings
@@ -104,7 +101,13 @@ localparam LINES_EVEN_START 	= LINES_ODD_END    + LINES_ODD_START + 1;
 localparam LINES_EVEN_END   	= LINES_EVEN_START + VGA_RES_V_ACT_2;
 
 // Global Reset
-wire 			aresetn;
+wire 						aresetn;
+
+// User Control
+wire 						grab_base;
+wire 						track_object;
+wire						disp_delta;
+wire [(COLOR_WIDTH-1):0]	sat_thresh;
 
 // TV Decode Pipeline Output
 wire [(COLOR_WIDTH-1):0]	Red; 				// RGB data after YCbCr conversion
@@ -143,8 +146,12 @@ wire [(DISP_WIDTH-1):0]		vga_x;				// VGA horizontal position
 wire [(DISP_WIDTH-1):0]		vga_y;				// VGA vertical position
 wire						vga_ready;			// VGA data request
 
-// Reset to Key
-assign aresetn = KEY[0];
+// Map user control to peripherals
+assign aresetn 		=  KEY[0];
+assign grab_base 	= ~KEY[1];
+assign track_object =  SW[16];
+assign disp_delta   =  SW[17];
+assign sat_thresh   =  SW[(COLOR_WIDTH-1):0];
 
 // Video Input Decode Pipeline
 video_input video_input_inst
@@ -242,7 +249,7 @@ sram_wrapper sram_wrapper_inst
 	.aresetn 	(aresetn),
 
 	// Wrapper Signals
-	.wen 		(~KEY[1]),
+	.wen 		(grab_base),
 	.addr 		({vga_x[9:0], vga_y[9:0]}),
 	.din		(sdram_output),
 	.dout 		(sram_output),
@@ -258,19 +265,17 @@ sram_wrapper sram_wrapper_inst
 );
 
 delta_frame #(
-	.INPUT_WIDTH (COLOR_WIDTH)
+	.INPUT_WIDTH 	(COLOR_WIDTH)
 ) delta_frame_inst (
-	
 	// Control
 	.clk 			(TD_CLK27),
 	.aresetn		(aresetn),
-	.enable 		(SW[17]),
 
 	// For Moving Average Filter
 	.is_not_blank	(vga_ready),
 
 	// For Saturation Filter
-	.threshold 		(SW[(COLOR_WIDTH-1):0]),
+	.threshold 		(sat_thresh),
 
 	// Input Data
 	.base_frame     (sram_output [(COLOR_WIDTH-1):0]),
@@ -289,7 +294,7 @@ measure_position #(
 	// Control
 	.clk 			(TD_CLK27),
 	.aresetn 		(aresetn),
-	.enable 		(SW[17]),
+	.enable 		(track_object),
 
 	// Input Data
 	.vga_x 			(vga_x),
@@ -302,24 +307,25 @@ measure_position #(
 );
 
 color_position #(
+	.THRESHOLD    	(TARGET_SIZE),
 	.COLOR_WIDTH	(COLOR_WIDTH),
 	.DISP_WIDTH		(DISP_WIDTH)
 ) color_position_inst (
 	// Control
 	.clk 			(TD_CLK27),
 	.aresetn 		(aresetn),
-	.enable 		(SW[17]),
+	.enable 		(track_object),
 
 	// Input Data: From VGA
 	.x_pos 			(vga_x),
 	.y_pos 			(vga_y),
 
-	// Input Data: From measure
+	// Input Data: From Measure
 	.x_obj 			(x_object),
 	.y_obj 			(y_object),
 
-	// Input Data: Regular video stream
-	.curr 			(sdram_output[(COLOR_WIDTH-1):0]),
+	// Input Data: Output Video
+	.curr 			(disp_delta ? delta_frame : sdram_output[(COLOR_WIDTH-1):0]),
 
 	// Output Data: To VGA
 	.r_out 			(red_out),

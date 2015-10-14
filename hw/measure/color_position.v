@@ -5,6 +5,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 module color_position # (
+	parameter THRESHOLD   = 20,
 	parameter COLOR_WIDTH = 10,
 	parameter DISP_WIDTH  = 11
 )(
@@ -29,9 +30,6 @@ module color_position # (
 	output wire [(COLOR_WIDTH-1):0] g_out,
 	output wire [(COLOR_WIDTH-1):0] b_out
 );
-
-// Internal Parameters
-localparam THRESHOLD = 20;
 
 // Internal Signals
 wire 					vga_is_object;

@@ -10,7 +10,6 @@ module delta_frame #(
 	// Control
 	input wire 						clk,
 	input wire 						aresetn,
-	input wire 						enable,
 
 	// Moving Average Filter
 	input wire 						is_not_blank,
@@ -42,20 +41,17 @@ reg  [(INPUT_WIDTH-1):0] old_4;
 wire [(INPUT_WIDTH+1):0] sum;
 wire [(INPUT_WIDTH+1):0] avg;
 
-// Saturation Filter (with moving average filter)
-assign delta_frame = enable ? ((avg[(INPUT_WIDTH-1):0] > threshold) ? {INPUT_WIDTH{1'b1}} : {INPUT_WIDTH{1'b0}}) : int_delta_frame;
+// Saturation Filter
+assign delta_frame = ((avg[(INPUT_WIDTH-1):0] > threshold) ? {INPUT_WIDTH{1'b1}} : {INPUT_WIDTH{1'b0}});
 
 always @(posedge clk or negedge aresetn) begin
 	if (~aresetn) 							int_delta_frame <= 'd0;
-	// Only produce delta if enable is high
-	else if (enable) 
+	else
 		begin
 			// Poor man's absolute value
 			if (curr_frame > base_frame)	int_delta_frame <= curr_frame - base_frame;
 			else 							int_delta_frame <= base_frame - curr_frame;
 		end
-	// Otherwise just pump the current frame through
-	else 									int_delta_frame <= curr_frame;
 end
 
 
