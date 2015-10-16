@@ -5,8 +5,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 module delta_frame #(
-	parameter INPUT_WIDTH = 10,
-	parameter DISP_WIDTH  = 11
+	parameter INPUT_WIDTH = 10
 )(
 	// Control
 	input wire 						clk,
@@ -14,9 +13,6 @@ module delta_frame #(
 
 	// Moving Average Filter
 	input wire 						is_not_blank,
-
-	// Position hack for left side problem
-	input wire [(DISP_WIDTH-1):0]	x_pos,
 
 	// Saturation Filter
 	input wire [(INPUT_WIDTH-1):0]	threshold, 
@@ -30,30 +26,27 @@ module delta_frame #(
 );
 
 // Moving Average Filter
-localparam FILTER_LENGTH = 5;
-
-// Position hack for left side problem
-localparam POS_MAX 		 = 620;
+localparam FILTER_LENGTH 	   = 5;
+localparam CLOG2_FILTER_LENGTH = 3;
+localparam SUM_LENGTH 		   = CLOG2_FILTER_LENGTH + INPUT_WIDTH;
 
 // Internal Delta Result
 reg  [(INPUT_WIDTH-1):0] int_delta_frame;
 
 // Moving Average Filter
+genvar 					 c;
+integer 				 i;
 reg  [2:0] 				 counter;
-reg  [(INPUT_WIDTH-1):0] old_0;
-reg  [(INPUT_WIDTH-1):0] old_1;
-reg  [(INPUT_WIDTH-1):0] old_2;
-reg  [(INPUT_WIDTH-1):0] old_3;
-reg  [(INPUT_WIDTH-1):0] old_4;
-wire [(INPUT_WIDTH+1):0] sum;
-wire [(INPUT_WIDTH+1):0] avg;
+reg  [(INPUT_WIDTH-1):0] old [FILTER_LENGTH];
+reg  [(SUM_LENGTH-1):0]  sum;
+wire [(INPUT_WIDTH-1):0] avg;
 
 // Saturation Filter
-assign delta_frame = ((avg[(INPUT_WIDTH-1):0] > threshold) ? {INPUT_WIDTH{1'b1}} : {INPUT_WIDTH{1'b0}});
+assign delta_frame = ((avg > threshold) ? {INPUT_WIDTH{1'b1}} : {INPUT_WIDTH{1'b0}});
 
+// Delta Frame
 always @(posedge clk or negedge aresetn) begin
 	if (~aresetn) 							int_delta_frame <= 'd0;
-	else if (x_pos > POS_MAX)				int_delta_frame <= 'd0;
 	else
 		begin
 			// Poor man's absolute value
@@ -62,9 +55,7 @@ always @(posedge clk or negedge aresetn) begin
 		end
 end
 
-
 // Moving Average Filter
-
 always @(posedge clk or negedge aresetn) begin
 	if (~aresetn) 						counter <= 'd0;
 	else if (~is_not_blank)				counter <= counter;
@@ -72,74 +63,22 @@ always @(posedge clk or negedge aresetn) begin
 	else 		  						counter <= counter + 1;
 end
 
-always @(posedge clk or negedge aresetn) begin
-	if (~aresetn) 
-		begin
-			old_0 <= 'd0;
-			old_1 <= 'd0;
-			old_2 <= 'd0;
-			old_3 <= 'd0;
-			old_4 <= 'd0;
+generate 
+	for (c = 0; c < FILTER_LENGTH; c = c + 1) begin: moving_avg_filter
+		always @(posedge clk or negedge aresetn) begin
+			if (~aresetn)			old[c] <= 'd0;
+			else if (counter == c)	old[c] <= int_delta_frame;
+			else					old[c] <= old[c];
 		end
-	else if (counter == 0)
-		begin
-			old_0 <= int_delta_frame;
-			old_1 <= old_1;
-			old_2 <= old_2;
-			old_3 <= old_3;
-			old_4 <= old_4;
-		end
-	else if (counter == 1)
-		begin
-			old_0 <= old_0;
-			old_1 <= int_delta_frame;
-			old_2 <= old_2;
-			old_3 <= old_3;
-			old_4 <= old_4;
-		end
-	else if (counter == 2)
-		begin
-			old_0 <= old_0;
-			old_1 <= old_1;
-			old_2 <= int_delta_frame;
-			old_3 <= old_3;
-			old_4 <= old_4;
-		end
-	else if (counter == 3)
-		begin
-			old_0 <= old_0;
-			old_1 <= old_1;
-			old_2 <= old_2;
-			old_3 <= int_delta_frame;
-			old_4 <= old_4;
-		end				
-	else if (counter == 4)
-		begin
-			old_0 <= old_0;
-			old_1 <= old_1;
-			old_2 <= old_2;
-			old_3 <= old_3;
-			old_4 <= int_delta_frame;
-		end		
-	else 
-		begin
-			old_0 <= old_0;
-			old_1 <= old_1;
-			old_2 <= old_2;
-			old_3 <= old_3;
-			old_4 <= old_4;
-		end
+	end
+endgenerate
+
+always @* begin
+	sum = 'd0;
+	for (i = 0; i < FILTER_LENGTH; i = i + 1)
+		sum = sum + old[i];
 end
 
-assign sum = old_0 + old_1 + old_2 + old_3 + old_4;
-
-delta_divide moving_avg_div
-(
-	.aclr		(1'b0),
-	.clock		(clk),
-	.denom		(FILTER_LENGTH),
-	.numer		(sum),
-	.quotient	(avg),
-);
+assign avg = sum / FILTER_LENGTH;
 
 endmodule
