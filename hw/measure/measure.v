@@ -76,13 +76,14 @@ localparam COLOR_WIDTH 			= 10;
 // SDRAM and SRAM Data Width
 localparam RAM_WIDTH 			= 16;
 
-// Pad bits needed for memory
-localparam PAD_BITS 			= RAM_WIDTH - COLOR_WIDTH;
+// Moving Average Filter
+localparam FILTER_LENGTH 		= 20;
+localparam CLOG2_FILTER_LENGTH  = 5;
 
 // Number of pixels to draw in each direction from the target
 localparam TARGET_SIZE 			= 10;
 
-// Output Resolution Parameters (units: pixels)
+// Output Resolution Parameters for a 27MHz clock (units: pixels)
 localparam VGA_RES_POLAR   		= 1'b0; // HS and VS are active-low for these settings
 localparam VGA_RES_H_FRONT 		= 16;   // Horizontal Front Porch
 localparam VGA_RES_H_SYNC  		= 98;   // Horizontal Sync Length
@@ -93,6 +94,9 @@ localparam VGA_RES_V_SYNC  		= 2;    // Vertical Sync Length
 localparam VGA_RES_V_BACK  		= 31;   // Vertical Back Porch
 localparam VGA_RES_V_ACT   		= 480;  // Vertical Actual (Visible)
 localparam VGA_RES_V_ACT_2 		= 240;  // Just divide the above number by 2
+
+// Pad bits needed for memory
+localparam PAD_BITS 			= RAM_WIDTH - COLOR_WIDTH;
 
 // SDRAM Parameters (units: pixels)
 localparam LINES_ODD_START 		= VGA_RES_V_FRONT  + VGA_RES_V_SYNC;
@@ -265,7 +269,9 @@ sram_wrapper sram_wrapper_inst
 );
 
 delta_frame #(
-	.INPUT_WIDTH 	(COLOR_WIDTH)
+	.INPUT_WIDTH 			(COLOR_WIDTH),
+	.FILTER_LENGTH 			(FILTER_LENGTH),
+	.CLOG2_FILTER_LENGTH 	(CLOG2_FILTER_LENGTH)	
 ) delta_frame_inst (
 	// Control
 	.clk 			(TD_CLK27),

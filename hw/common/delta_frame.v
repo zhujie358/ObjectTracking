@@ -5,7 +5,9 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 module delta_frame #(
-	parameter INPUT_WIDTH = 10
+	parameter INPUT_WIDTH   	  = 10,
+	parameter FILTER_LENGTH 	  = 20,
+	parameter CLOG2_FILTER_LENGTH = 5
 )(
 	// Control
 	input wire 						clk,
@@ -25,21 +27,17 @@ module delta_frame #(
 	output wire [(INPUT_WIDTH-1):0]	delta_frame
 );
 
-// Moving Average Filter
-localparam FILTER_LENGTH 	   = 5;
-localparam CLOG2_FILTER_LENGTH = 3;
-localparam SUM_LENGTH 		   = CLOG2_FILTER_LENGTH + INPUT_WIDTH;
+// Not totally sure if this is the right way, think its safe though
+localparam SUM_LENGTH = CLOG2_FILTER_LENGTH + INPUT_WIDTH;
 
-// Internal Delta Result
-reg  [(INPUT_WIDTH-1):0] int_delta_frame;
-
-// Moving Average Filter
+// Internal signals and variables
 genvar 					 c;
 integer 				 i;
 reg  [2:0] 				 counter;
 reg  [(INPUT_WIDTH-1):0] old [FILTER_LENGTH];
 reg  [(SUM_LENGTH-1):0]  sum;
 wire [(INPUT_WIDTH-1):0] avg;
+reg  [(INPUT_WIDTH-1):0] int_delta_frame;
 
 // Saturation Filter
 assign delta_frame = ((avg > threshold) ? {INPUT_WIDTH{1'b1}} : {INPUT_WIDTH{1'b0}});
