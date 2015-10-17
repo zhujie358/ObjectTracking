@@ -5,7 +5,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 module delta_frame #(
-	parameter INPUT_WIDTH   	  = 10,
+	parameter COLOR_WIDTH   	  = 10,
 	parameter FILTER_LENGTH 	  = 20,
 	parameter CLOG2_FILTER_LENGTH = 5
 )(
@@ -18,32 +18,32 @@ module delta_frame #(
 	input wire 						is_not_blank,
 
 	// Saturation Filter
-	input wire [(INPUT_WIDTH-1):0]	threshold, 
+	input wire [(COLOR_WIDTH-1):0]	threshold, 
 
 	// Input Data
-	input wire [(INPUT_WIDTH-1):0]	base_frame,
-	input wire [(INPUT_WIDTH-1):0]	curr_frame,
+	input wire [(COLOR_WIDTH-1):0]	base_frame,
+	input wire [(COLOR_WIDTH-1):0]	curr_frame,
 
 	// Output Data
-	output wire [(INPUT_WIDTH-1):0]	delta_frame
+	output wire [(COLOR_WIDTH-1):0]	delta_frame
 );
 
 // Not totally sure if this is the right way, think its safe though
-localparam SUM_LENGTH = CLOG2_FILTER_LENGTH + INPUT_WIDTH;
+localparam SUM_LENGTH = CLOG2_FILTER_LENGTH + COLOR_WIDTH;
 
 // Internal signals and variables
 genvar 					 c;
 integer 				 i;
 reg  [2:0] 				 counter;
-reg  [(INPUT_WIDTH-1):0] old [FILTER_LENGTH];
+reg  [(COLOR_WIDTH-1):0] old [FILTER_LENGTH];
 reg  [(SUM_LENGTH-1):0]  sum;
-wire [(INPUT_WIDTH-1):0] avg;
-reg  [(INPUT_WIDTH-1):0] int_delta_frame;
-wire [(INPUT_WIDTH-1):0] comp_value;
+wire [(COLOR_WIDTH-1):0] avg;
+reg  [(COLOR_WIDTH-1):0] int_delta_frame;
+wire [(COLOR_WIDTH-1):0] comp_value;
 
 // Saturation Filter
 assign comp_value  = is_filter ? avg : int_delta_frame;
-assign delta_frame = (comp_value > threshold) ? {INPUT_WIDTH{1'b1}} : {INPUT_WIDTH{1'b0}};
+assign delta_frame = (comp_value > threshold) ? {COLOR_WIDTH{1'b1}} : {COLOR_WIDTH{1'b0}};
 
 // Delta Frame
 always @(posedge clk or negedge aresetn) begin

@@ -7,10 +7,11 @@
 `timescale 1ns/1ns
 
 module measure_position #(
-	parameter INPUT_WIDTH = 11,
-	parameter COLOR_WIDTH = 10,
-	parameter FRAME_X_MAX = 640,
-	parameter FRAME_Y_MAX = 480
+	parameter INPUT_WIDTH  = 11,
+	parameter COLOR_WIDTH  = 10,
+	parameter FRAME_X_MAX  = 640,
+	parameter FRAME_Y_MAX  = 480,
+	parameter COUNT_THRESH = 40
 )(	//////////// CLOCK //////////
 	input 		          					clk,
 
@@ -94,8 +95,17 @@ always @(posedge clk or negedge aresetn) begin
 	// Pulse result at end of frame
 	else if (vga_x == FRAME_X_MAX & vga_y == FRAME_Y_MAX)
 		begin
-			int_x_position 	    <= x_coordinate_sum / total_count; 
-			int_y_position 	    <= y_coordinate_sum / total_count;
+			// Places a criteria on number of pixels that define an object
+			if (total_count < COUNT_THRESH) 
+				begin
+					int_x_position 	    <= {INPUT_WIDTH {1'b1}}; 
+					int_y_position 	    <= {INPUT_WIDTH {1'b1}};
+				end
+			else
+				begin
+					int_x_position 	    <= x_coordinate_sum / total_count; 
+					int_y_position 	    <= y_coordinate_sum / total_count;
+				end
 		end
 	else 
 		begin

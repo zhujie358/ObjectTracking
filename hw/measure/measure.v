@@ -80,6 +80,9 @@ localparam RAM_WIDTH 			= 16;
 localparam FILTER_LENGTH 		= 20;
 localparam CLOG2_FILTER_LENGTH  = 5;
 
+// Minimum number of pixels an object must have to be tracked
+localparam COUNT_THRESHOLD      = 40;
+
 // Number of pixels to draw in each direction from the target
 localparam TARGET_SIZE 			= 10;
 
@@ -271,7 +274,7 @@ sram_wrapper sram_wrapper_inst
 );
 
 delta_frame #(
-	.INPUT_WIDTH 			(COLOR_WIDTH),
+	.COLOR_WIDTH 			(COLOR_WIDTH),
 	.FILTER_LENGTH 			(FILTER_LENGTH),
 	.CLOG2_FILTER_LENGTH 	(CLOG2_FILTER_LENGTH)	
 ) delta_frame_inst (
@@ -298,7 +301,8 @@ measure_position #(
 	.INPUT_WIDTH	(DISP_WIDTH),
 	.COLOR_WIDTH	(COLOR_WIDTH),
 	.FRAME_X_MAX 	(VGA_RES_H_ACT),
-	.FRAME_Y_MAX 	(VGA_RES_V_ACT)
+	.FRAME_Y_MAX 	(VGA_RES_V_ACT),
+	.COUNT_THRESH   (COUNT_THRESHOLD)
 ) measure_position_inst (
 	// Control
 	.clk 			(TD_CLK27),
