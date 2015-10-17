@@ -48,6 +48,7 @@ assign delta_frame = (comp_value > threshold) ? {INPUT_WIDTH{1'b1}} : {INPUT_WID
 // Delta Frame
 always @(posedge clk or negedge aresetn) begin
 	if (~aresetn) 							int_delta_frame <= 'd0;
+	else if (~is_not_blank)					int_delta_frame <= 'd0;
 	else
 		begin
 			// Poor man's absolute value
@@ -68,6 +69,7 @@ generate
 	for (c = 0; c < FILTER_LENGTH; c = c + 1) begin: moving_avg_filter
 		always @(posedge clk or negedge aresetn) begin
 			if (~aresetn)			old[c] <= 'd0;
+			else if (~is_not_blank)	old[c] <= 'd0;
 			else if (counter == c)	old[c] <= int_delta_frame;
 			else					old[c] <= old[c];
 		end
