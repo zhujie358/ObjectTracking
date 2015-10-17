@@ -134,6 +134,7 @@ wire						vga_even_ready;		// VGA data request even field
 wire [(RAM_WIDTH-1):0]		sram_output;
 
 // Delta Frame Generator
+wire						filter_delta;
 wire [(COLOR_WIDTH-1):0]	delta_frame;
 
 // Measure 
@@ -153,6 +154,7 @@ wire						vga_ready;			// VGA data request
 // Map user control to peripherals
 assign aresetn 		=  KEY[0];
 assign grab_base 	= ~KEY[1];
+assign filter_delta =  SW[15];
 assign track_object =  SW[16];
 assign disp_delta   =  SW[17];
 assign sat_thresh   =  SW[(COLOR_WIDTH-1):0];
@@ -278,6 +280,7 @@ delta_frame #(
 	.aresetn		(aresetn),
 
 	// For Moving Average Filter
+	.is_filter 		(filter_delta),
 	.is_not_blank	(vga_ready),
 
 	// For Saturation Filter

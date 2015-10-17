@@ -14,6 +14,7 @@ module delta_frame #(
 	input wire 						aresetn,
 
 	// Moving Average Filter
+	input wire						is_filter,
 	input wire 						is_not_blank,
 
 	// Saturation Filter
@@ -38,9 +39,11 @@ reg  [(INPUT_WIDTH-1):0] old [FILTER_LENGTH];
 reg  [(SUM_LENGTH-1):0]  sum;
 wire [(INPUT_WIDTH-1):0] avg;
 reg  [(INPUT_WIDTH-1):0] int_delta_frame;
+wire [(INPUT_WIDTH-1):0] comp_value;
 
 // Saturation Filter
-assign delta_frame = ((avg > threshold) ? {INPUT_WIDTH{1'b1}} : {INPUT_WIDTH{1'b0}});
+assign comp_value  = is_filter ? avg : int_delta_frame;
+assign delta_frame = (comp_value > threshold) ? {INPUT_WIDTH{1'b1}} : {INPUT_WIDTH{1'b0}};
 
 // Delta Frame
 always @(posedge clk or negedge aresetn) begin
