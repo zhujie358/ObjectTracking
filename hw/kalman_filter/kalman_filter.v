@@ -145,6 +145,10 @@ wire [(COLOR_WIDTH-1):0]	delta_frame;
 wire [(DISP_WIDTH-1):0]		x_object;
 wire [(DISP_WIDTH-1):0]		y_object;
 
+// Kalman Filter
+wire [(DISP_WIDTH-1):0]		x_kalman;
+wire [(DISP_WIDTH-1):0]		y_kalman;
+
 // Color Position
 wire [(COLOR_WIDTH-1):0]	red_out;
 wire [(COLOR_WIDTH-1):0]	green_out;
@@ -321,6 +325,20 @@ measure_position #(
 );
 
 // INSERT KALMAN FILTER HERE
+kalman #(
+	.DISP_WIDTH (DISP_WIDTH)
+) kalman_inst (
+	.clk 			(TD_CLK27),
+	.aresetn 		(aresetn),
+
+	// Input Data
+	.z_x 			(x_object),
+	.z_y			(y_object),
+
+	// Output Data
+	.z_x_new 		(x_kalman),
+	.z_y_new		(y_kalman)
+);
 
 color_position #(
 	.THRESHOLD    	(TARGET_SIZE),
@@ -339,6 +357,9 @@ color_position #(
 	// Input Data: From Measure
 	.x_obj 			(x_object),
 	.y_obj 			(y_object),
+
+	.x_kalman 		(x_kalman),
+	.y_kalman 		(y_kalman),
 
 	// Input Data: Output Video
 	.curr 			(disp_delta ? delta_frame : sdram_output[(COLOR_WIDTH-1):0]),

@@ -24,6 +24,8 @@ module color_position # (
 	// Center of Object
 	input wire [(DISP_WIDTH-1):0] x_obj,
 	input wire [(DISP_WIDTH-1):0] y_obj,
+	input wire [(DISP_WIDTH-1):0] x_kalman,
+	input wire [(DISP_WIDTH-1):0] y_kalman,
 
 	// Output Data
 	output wire [(COLOR_WIDTH-1):0] r_out,
@@ -35,6 +37,11 @@ module color_position # (
 wire 					vga_is_object;
 wire [(DISP_WIDTH-1):0] x_diff;
 wire [(DISP_WIDTH-1):0] y_diff;
+
+wire 					vga_is_kalman;
+wire [(DISP_WIDTH-1):0] x_diff2;
+wire [(DISP_WIDTH-1):0] y_diff2;
+
 reg [(COLOR_WIDTH-1):0] int_r_out;
 reg [(COLOR_WIDTH-1):0] int_g_out;
 reg [(COLOR_WIDTH-1):0] int_b_out;
@@ -47,6 +54,10 @@ assign b_out = int_b_out;
 assign x_diff		 = (x_pos > x_obj) ? x_pos - x_obj : x_obj - x_pos;
 assign y_diff		 = (y_pos > y_obj) ? y_pos - y_obj : y_obj - y_pos;
 assign vga_is_object = (x_diff < THRESHOLD) & (y_diff < THRESHOLD);
+
+assign x_diff2		 = (x_pos > x_kalman) ? x_pos - x_kalman : x_kalman - x_pos;
+assign y_diff2		 = (y_pos > y_kalman) ? y_pos - y_kalman : y_kalman - y_pos;
+assign vga_is_kalman = (x_diff2 < THRESHOLD) & (y_diff2 < THRESHOLD);
 
 // Drive RGB to red if the above point is near the object
 always @(posedge clk or negedge aresetn) begin
@@ -62,6 +73,13 @@ always @(posedge clk or negedge aresetn) begin
 			int_g_out <= {COLOR_WIDTH {1'b0}};
 			int_b_out <= {COLOR_WIDTH {1'b0}};
 		end
+	else if (enable & vga_is_kalman)
+		begin
+			int_r_out <= {COLOR_WIDTH {1'b0}};
+			int_g_out <= {COLOR_WIDTH {1'b1}};
+			int_b_out <= {COLOR_WIDTH {1'b0}};
+		end
+
 	else
 		begin
 			int_r_out <= curr;
