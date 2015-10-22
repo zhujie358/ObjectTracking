@@ -1,4 +1,4 @@
-EXP_NAME = measure
+EXP_NAME = kalman_filter
 
 make all:
 	@echo "------------ TARGETS ------------"
