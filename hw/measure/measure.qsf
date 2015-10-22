@@ -459,5 +459,5 @@ set_global_assignment -name VERILOG_FILE ../common/sram_wrapper.v
 set_global_assignment -name VERILOG_FILE ../common/delta_frame.v
 set_global_assignment -name VERILOG_FILE ../common/delta_divide.v
 set_global_assignment -name VERILOG_FILE ../common/rgb_to_grayscale.v
-set_global_assignment -name VERILOG_FILE ./measure_position.v
-set_global_assignment -name VERILOG_FILE ./color_position.v
+set_global_assignment -name VERILOG_FILE ../common/measure_position.v
+set_global_assignment -name VERILOG_FILE ../common/color_position.v
