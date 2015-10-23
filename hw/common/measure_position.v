@@ -22,6 +22,7 @@ module measure_position #(
 
 	output wire		[(INPUT_WIDTH-1):0]		x_position,
 	output wire		[(INPUT_WIDTH-1):0]		y_position,
+	output wire								xy_valid,
 
 	//////////// CONTROL ///////////
 	input wire								aresetn,
@@ -36,8 +37,10 @@ reg [26:0]		   		y_coordinate_sum;
 // Wrappers
 reg [(INPUT_WIDTH-1):0]	int_x_position;
 reg [(INPUT_WIDTH-1):0]	int_y_position;
+reg						int_xy_valid;
 assign x_position     = int_x_position;
 assign y_position 	  = int_y_position;
+assign xy_valid       = int_xy_valid;
 
 // These are the three values used in the algorithm
 always @(posedge clk or negedge aresetn) begin
@@ -83,18 +86,21 @@ always @(posedge clk or negedge aresetn) begin
 	// Reset
 	if (~aresetn)
 		begin
+			int_xy_valid		<= 1'b0;
 			int_x_position      <= 'd0;
 			int_y_position      <= 'd0;
 		end	
 	// Enable
 	else if (~enable)
 		begin
+			int_xy_valid		<= 1'b0;
 			int_x_position 	    <= 'd0;
 			int_y_position 	    <= 'd0;		
 		end
 	// Pulse result at end of frame
 	else if (vga_x == FRAME_X_MAX & vga_y == FRAME_Y_MAX)
 		begin
+			int_xy_valid		<= 1'b1;
 			// Places a criteria on number of pixels that define an object
 			if (total_count < COUNT_THRESH) 
 				begin
@@ -109,6 +115,7 @@ always @(posedge clk or negedge aresetn) begin
 		end
 	else 
 		begin
+			int_xy_valid		<= 1'b0;
 			int_x_position 		<= int_x_position;
 			int_y_position 		<= int_y_position;
 		end

@@ -144,6 +144,7 @@ wire [(COLOR_WIDTH-1):0]	delta_frame;
 // Measure 
 wire [(DISP_WIDTH-1):0]		x_object;
 wire [(DISP_WIDTH-1):0]		y_object;
+wire						xy_valid;
 
 // Kalman Filter
 wire [(DISP_WIDTH-1):0]		x_kalman;
@@ -321,7 +322,8 @@ measure_position #(
 
 	// Output Data
 	.x_position 	(x_object),
-	.y_position 	(y_object)
+	.y_position 	(y_object),
+	.xy_valid		(xy_valid)
 );
 
 // INSERT KALMAN FILTER HERE
@@ -334,6 +336,7 @@ kalman #(
 	// Input Data
 	.z_x 			(x_object),
 	.z_y			(y_object),
+	.valid 			(xy_valid),
 
 	// Output Data
 	.z_x_new 		(x_kalman),
@@ -354,10 +357,9 @@ color_position #(
 	.x_pos 			(vga_x),
 	.y_pos 			(vga_y),
 
-	// Input Data: From Measure
+	// Input Data: Location of object
 	.x_obj 			(x_object),
 	.y_obj 			(y_object),
-
 	.x_kalman 		(x_kalman),
 	.y_kalman 		(y_kalman),
 
