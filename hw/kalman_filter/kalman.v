@@ -73,24 +73,25 @@ wire 					fsm_clear_all;
 wire 					fsm_clear_tmp;
 
 // Static Matrices
-wire [(ARCH_W-1):0]		x_init	   [NUM_STATES];
-wire [(ARCH_W-1):0]		p_init	   [NUM_STATES][NUM_STATES];
-wire [(ARCH_W-1):0] 	f_mat 	   [NUM_STATES][NUM_STATES];
-wire [(ARCH_W-1):0]		q_mat 	   [NUM_STATES][NUM_STATES];
-wire [(ARCH_W-1):0] 	r_mat 	   [NUM_MEASUR][NUM_MEASUR];
-wire [(ARCH_W-1):0]		p_helper   [NUM_STATES][NUM_STATES];
+wire [(ARCH_W-1):0]		x_init	   [0:NUM_STATES-1];
+wire [(ARCH_W-1):0]		p_init	   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire [(ARCH_W-1):0] 	f_mat 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire [(ARCH_W-1):0]		q_mat 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire [(ARCH_W-1):0] 	r_mat 	   [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire [(ARCH_W-1):0]		p_helper   [0:NUM_STATES-1][0:NUM_STATES-1];
 wire [(ARCH_W-1):0]		s_det;
 
 // Dynamic Matrices and Vectors
-reg  [(ARCH_W-1):0]		x_curr 	   [NUM_STATES];
-reg  [(ARCH_W-1):0]		x_next 	   [NUM_STATES];
-reg  [(ARCH_W-1):0]		p_curr 	   [NUM_STATES][NUM_STATES];
-reg  [(ARCH_W-1):0]		p_next_tmp [NUM_STATES][NUM_STATES];
-reg  [(ARCH_W-1):0]		p_next 	   [NUM_STATES][NUM_STATES];
-reg  [(ARCH_W-1):0] 	y_vec	   [NUM_MEASUR];
-reg  [(ARCH_W-1):0]		s_mat	   [NUM_MEASUR][NUM_MEASUR];
-reg  [(ARCH_W-1):0]		s_mat_inv  [NUM_MEASUR][NUM_MEASUR];
-reg  [(ARCH_W-1):0]		k_mat 	   [NUM_STATES][NUM_MEASUR];
+reg  [(ARCH_W-1):0]		x_curr 	   [0:NUM_STATES-1];
+reg  [(ARCH_W-1):0]		x_next 	   [0:NUM_STATES-1];
+reg  [(ARCH_W-1):0]		p_curr 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+reg  [(ARCH_W-1):0]		p_next_tmp [0:NUM_STATES-1][0:NUM_STATES-1];
+reg  [(ARCH_W-1):0]		p_next 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+reg  [(ARCH_W-1):0]		z_vec	   [0:NUM_MEASUR-1];
+reg  [(ARCH_W-1):0] 	y_vec	   [0:NUM_MEASUR-1];
+reg  [(ARCH_W-1):0]		s_mat	   [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+reg  [(ARCH_W-1):0]		s_mat_inv  [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+reg  [(ARCH_W-1):0]		k_mat 	   [0:NUM_STATES-1][0:NUM_MEASUR-1];
 
 // Loops that get rolled out on compile time
 genvar i, j;
@@ -179,6 +180,25 @@ endgenerate
 
 //////////////////////////////// DYNAMIC MATRICES AND VECTORS //////////////////////////////////
 
+// Measurement Value - 2x1 vector latched when valid data arrives
+always @(posedge clk or negedge aresetn) begin
+	if (~aresetn) 
+		begin
+			z_vec[0] <= 'd0;
+			z_vec[1] <= 'd0;
+		end
+ 	else if (ready & valid)	
+ 		begin
+ 			z_vec[0] <= z_x;
+ 			z_vec[1] <= z_y;
+ 		end
+ 	else 
+ 		begin
+ 			z_vec[0] <= z_vec[0];
+ 			z_vec[1] <= z_vec[1];
+ 		end
+end
+
 // Next X Value - 4x4 matrix times a 4x1 vector
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_x_next
@@ -224,18 +244,16 @@ generate
 endgenerate
 
 // Y Vector - 2x1 measurement vector (inputs) minus predicted position vector, the first two entries of the 4x1 vector x_next
-always @(posedge clk) begin
-	if (fsm_clear_tmp) 					y_vec[0] <= 'd0;
-	// Compute, F = 0
-	else if (fsm_curr == FSM_INTERM_1)	y_vec[0] <= z_x - x_next[0];
-	else 								y_vec[0] <= y_vec[0];
-end	
-always @(posedge clk) begin
-	if (fsm_clear_tmp) 					y_vec[1] <= 'd0;
-	// Compute, F = 0
-	else if (fsm_curr == FSM_INTERM_1)	y_vec[1] <= z_y - x_next[1];
-	else 								y_vec[1] <= y_vec[1];
-end	
+generate
+	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: gen_y_vec
+		always @(posedge clk) begin
+			if (fsm_clear_tmp) 					y_vec[i] <= 'd0;
+			// Compute, F = 0
+			else if (fsm_curr == FSM_INTERM_1)	y_vec[i] <= z_vec[i] - x_next[i];
+			else 								y_vec[i] <= y_vec[i];
+		end	
+	end
+endgenerate
 
 // S Matrx - 2x2 matrix (top left corner of p_next) plus the R matrix
 generate
