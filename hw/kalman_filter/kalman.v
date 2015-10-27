@@ -61,7 +61,7 @@ localparam NUM_MEASUR 	= 2;
 
 // Fixed Point Values
 localparam FRAC   	 	= 6;
-localparam ONE_FI 		= 64;  	// round(1 << FRAC)
+localparam ONE_FI 		= 1 << FRAC;
 localparam T_STEP_FI 	= 1; 	// round(0.0155 << FRAC)
 
 /////////////////////////////// INTERNAL SIGNALS & VARIABLES ///////////////////////////////////
@@ -73,25 +73,25 @@ wire 					fsm_clear_all;
 wire 					fsm_clear_tmp;
 
 // Static Matrices
-wire [(ARCH_W-1):0]		x_init	   [0:NUM_STATES-1];
-wire [(ARCH_W-1):0]		p_init	   [0:NUM_STATES-1][0:NUM_STATES-1];
-wire [(ARCH_W-1):0] 	f_mat 	   [0:NUM_STATES-1][0:NUM_STATES-1];
-wire [(ARCH_W-1):0]		q_mat 	   [0:NUM_STATES-1][0:NUM_STATES-1];
-wire [(ARCH_W-1):0] 	r_mat 	   [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-wire [(ARCH_W-1):0]		p_helper   [0:NUM_STATES-1][0:NUM_STATES-1];
-wire [(ARCH_W-1):0]		s_det;
+wire 		[(ARCH_W-1):0]		x_init	   [0:NUM_STATES-1];
+wire 		[(ARCH_W-1):0]		p_init	   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire 		[(ARCH_W-1):0] 		f_mat 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire 		[(ARCH_W-1):0]		q_mat 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire 		[(ARCH_W-1):0] 		r_mat 	   [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire signed [(ARCH_W-1):0]		p_helper   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire signed [(ARCH_W-1):0]		s_det;
 
 // Dynamic Matrices and Vectors
-reg  [(ARCH_W-1):0]		x_curr 	   [0:NUM_STATES-1];
-reg  [(ARCH_W-1):0]		x_next 	   [0:NUM_STATES-1];
-reg  [(ARCH_W-1):0]		p_curr 	   [0:NUM_STATES-1][0:NUM_STATES-1];
-reg  [(ARCH_W-1):0]		p_next_tmp [0:NUM_STATES-1][0:NUM_STATES-1];
-reg  [(ARCH_W-1):0]		p_next 	   [0:NUM_STATES-1][0:NUM_STATES-1];
-reg  [(ARCH_W-1):0]		z_vec	   [0:NUM_MEASUR-1];
-reg  [(ARCH_W-1):0] 	y_vec	   [0:NUM_MEASUR-1];
-reg  [(ARCH_W-1):0]		s_mat	   [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-reg  [(ARCH_W-1):0]		s_mat_inv  [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-reg  [(ARCH_W-1):0]		k_mat 	   [0:NUM_STATES-1][0:NUM_MEASUR-1];
+reg  		[(ARCH_W-1):0]		x_curr 	   [0:NUM_STATES-1];
+reg  		[(ARCH_W-1):0]		x_next 	   [0:NUM_STATES-1];
+reg  		[(ARCH_W-1):0]		p_curr 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+reg  		[(ARCH_W-1):0]		p_next_tmp [0:NUM_STATES-1][0:NUM_STATES-1];
+reg  		[(ARCH_W-1):0]		p_next 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+reg  signed [(ARCH_W-1):0]		z_vec	   [0:NUM_MEASUR-1];
+reg  signed [(ARCH_W-1):0] 	y_vec	   [0:NUM_MEASUR-1];
+reg  signed [(ARCH_W-1):0]		s_mat	   [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+reg  signed [(ARCH_W-1):0]		s_mat_inv  [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+reg  signed [(ARCH_W-1):0]		k_mat 	   [0:NUM_STATES-1][0:NUM_MEASUR-1];
 
 // Loops that get rolled out on compile time
 genvar i, j;
@@ -127,7 +127,7 @@ assign fsm_clear_tmp = (fsm_curr == FSM_INIT) | (fsm_curr == FSM_IDLE);
 
 ///////////////////////////////// STATIC MATRICES AND VECTORS //////////////////////////////////
 
-// All of these have F = 0, except f_mat which has F = FRAC
+// All of these have F = 0, except f_mat which has F = FRAC and q_mat and has F = 2*FRAC
 
 // Set x_init to zeros, and p_init and q_mat to identity. Set f_mat to identity with t_step.
 generate
@@ -137,7 +137,7 @@ generate
 			if (i == j) 
 				begin
 					assign p_init[i][j] = 'd1;
-					assign q_mat[i][j] = 'd1;
+					assign q_mat[i][j] = ('d1 << 2*FRAC);
 					assign f_mat[i][j] = ONE_FI;
 				end
 			else if ((i == 0 & j == 2) | (i == 1 & j == 3))
@@ -233,10 +233,10 @@ generate
 		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_next_cols
 			always @(posedge clk) begin
 				if (fsm_clear_tmp)		 			p_next[i][j] <= 'd0;
-				// Compute, F = FRAC + FRAC
+				// Compute, F = 2*FRAC
 				else if (fsm_curr == FSM_PREDICT_2)	p_next[i][j] <= (p_next_tmp[i][0]*f_mat[j][0] + p_next_tmp[i][1]*f_mat[j][1] + p_next_tmp[i][2]*f_mat[j][2] + p_next_tmp[i][3]*f_mat[j][3]) + q_mat[i][j];
 				// Normalize, F = 0
-				else if (fsm_curr == FSM_NORMAL_1)  p_next[i][j] <= p_next[i][j] >> FRAC + FRAC;
+				else if (fsm_curr == FSM_NORMAL_1)  p_next[i][j] <= p_next[i][j] >> 2*FRAC;
 				else								p_next[i][j] <= p_next[i][j];
 			end
 		end
@@ -276,25 +276,25 @@ assign s_det = s_mat[0][0]*s_mat[1][1] - s_mat[0][1]*s_mat[1][0];
 always @(posedge clk) begin
 	if (fsm_clear_tmp)								 s_mat_inv[0][0] <= 'd0;
 	// Compute, F = 0 assuming that integer division is going on
-	else if (fsm_curr == FSM_INTERM_2 & s_det != 0)  s_mat_inv[0][0] <= s_mat_inv[1][1] / s_det;
+	else if (fsm_curr == FSM_INTERM_2 & s_det != 0)  s_mat_inv[0][0] <= s_mat[1][1] / s_det;
 	else 											 s_mat_inv[0][0] <= s_mat_inv[0][0];
 end
 always @(posedge clk) begin
 	if (fsm_clear_tmp)								 s_mat_inv[1][1] <= 'd0;
 	// Compute, F = 0 assuming that integer division is going on
-	else if (fsm_curr == FSM_INTERM_2 & s_det != 0)  s_mat_inv[1][1] <= s_mat_inv[0][0] / s_det;
+	else if (fsm_curr == FSM_INTERM_2 & s_det != 0)  s_mat_inv[1][1] <= s_mat[0][0] / s_det;
 	else 											 s_mat_inv[1][1] <= s_mat_inv[1][1];
 end
 always @(posedge clk) begin
 	if (fsm_clear_tmp)								 s_mat_inv[0][1] <= 'd0;
 	// Compute, F = 0 assuming that integer division is going on
-	else if (fsm_curr == FSM_INTERM_2 & s_det != 0)  s_mat_inv[0][1] <= -1*s_mat_inv[0][1] / s_det;
+	else if (fsm_curr == FSM_INTERM_2 & s_det != 0)  s_mat_inv[0][1] <= -1*s_mat[0][1] / s_det;
 	else 											 s_mat_inv[0][1] <= s_mat_inv[0][1];
 end
 always @(posedge clk) begin
 	if (fsm_clear_tmp)								 s_mat_inv[1][0] <= 'd0;
 	// Compute, F = 0 assuming that integer division is going on
-	else if (fsm_curr == FSM_INTERM_2 & s_det != 0)  s_mat_inv[1][0] <= -1*s_mat_inv[1][0] / s_det;
+	else if (fsm_curr == FSM_INTERM_2 & s_det != 0)  s_mat_inv[1][0] <= -1*s_mat[1][0] / s_det;
 	else 											 s_mat_inv[1][0] <= s_mat_inv[1][0];
 end
 

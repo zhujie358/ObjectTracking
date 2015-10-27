@@ -17,5 +17,10 @@ add wave -logic -radix unsigned myKalman/x_curr
 add wave -logic -radix decimal myKalman/p_next
 add wave -logic -radix decimal myKalman/p_curr
 add wave -logic -radix decimal myKalman/y_vec
+add wave -logic -radix decimal myKalman/s_mat
+add wave -logic -radix decimal myKalman/s_mat_inv
+add wave -logic -radix decimal myKalman/s_det
+add wave -logic -radix unsigned myKalman/z_x_new
+add wave -logic -radix unsigned myKalman/z_y_new
 
 run -all
