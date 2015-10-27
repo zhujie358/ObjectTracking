@@ -93,6 +93,7 @@ wire  [(ARCH_W-1):0]	p_next_mult [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1
 wire  [(ARCH_W-1):0]	p_next_sum1 [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_next_sum2 [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_next_sum3 [0:NUM_STATES-1][0:NUM_STATES-1];
+wire  [(ARCH_W-1):0]	p_next_sum4 [0:NUM_STATES-1][0:NUM_STATES-1];
 
 reg  [(ARCH_W-1):0]		p_next_tmp  [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_temp_mult [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1];
@@ -291,7 +292,7 @@ generate
 		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_next_cols
 			always @(posedge clk) begin
 				if (fsm_clear_tmp)		 			p_next[i][j] <= 'd0;
-				else if (fsm_curr == FSM_PREDICT_2)	p_next[i][j] <= p_next_sum3[i][j];
+				else if (fsm_curr == FSM_PREDICT_2)	p_next[i][j] <= p_next_sum4[i][j];
 				else								p_next[i][j] <= p_next[i][j];
 			end
 		end
@@ -307,6 +308,7 @@ generate
 					.N 				(ARCH_W)
 				) mult_p_next (
 			 		.i_multiplicand (p_next_tmp[i][k]),
+			 		// Notice the indices are flipped from the last mult b/c we want f_mat transpose here
 			 		.i_multiplier	(f_mat[j][k]),
 			 		.o_result		(p_next_mult[i][j][k])
 				);
@@ -341,11 +343,18 @@ generate
 				.a 				(p_next_sum1[i][j]),
 				.b 				(p_next_sum2[i][j]),
 				.c 				(p_next_sum3[i][j])
-			);			
+			);		
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_p_next4 (
+				.a 				(p_next_sum3[i][j]),
+				.b 				(q_mat[i][j]),
+				.c 				(p_next_sum4[i][j])
+			);							
 		end
 	end
 endgenerate
-
 
 // Current X Value - Set to predicted value for initial testing
 generate
@@ -370,7 +379,6 @@ generate
 		end
 	end
 endgenerate
-
 
 // Generate Outputs
 wire [(ARCH_W-1):0] strange_1 = x_curr[0];
