@@ -78,6 +78,7 @@ wire [(ARCH_W-1):0] 	r_mat 	    [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 
 // State Vector
 reg  [(ARCH_W-1):0]		x_curr		[0:NUM_STATES-1];
+
 reg  [(ARCH_W-1):0]		x_next 	    [0:NUM_STATES-1];
 wire [(ARCH_W-1):0]		x_next_mult [0:NUM_STATES-1][0:NUM_STATES-1];
 wire [(ARCH_W-1):0]		x_next_sum1 [0:NUM_STATES-1];
@@ -86,11 +87,21 @@ wire [(ARCH_W-1):0]		x_next_sum3 [0:NUM_STATES-1];
 
 // Covariance Matrix
 reg  [(ARCH_W-1):0]		p_curr		[0:NUM_STATES-1][0:NUM_STATES-1];
+
 reg  [(ARCH_W-1):0]		p_next 	    [0:NUM_STATES-1][0:NUM_STATES-1];
+wire  [(ARCH_W-1):0]	p_next_mult [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1];
+wire  [(ARCH_W-1):0]	p_next_sum1 [0:NUM_STATES-1][0:NUM_STATES-1];
+wire  [(ARCH_W-1):0]	p_next_sum2 [0:NUM_STATES-1][0:NUM_STATES-1];
+wire  [(ARCH_W-1):0]	p_next_sum3 [0:NUM_STATES-1][0:NUM_STATES-1];
+
 reg  [(ARCH_W-1):0]		p_next_tmp  [0:NUM_STATES-1][0:NUM_STATES-1];
+wire  [(ARCH_W-1):0]	p_temp_mult [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1];
+wire  [(ARCH_W-1):0]	p_temp_sum1 [0:NUM_STATES-1][0:NUM_STATES-1];
+wire  [(ARCH_W-1):0]	p_temp_sum2 [0:NUM_STATES-1][0:NUM_STATES-1];
+wire  [(ARCH_W-1):0]	p_temp_sum3 [0:NUM_STATES-1][0:NUM_STATES-1];
 
 // Loops that get rolled out on compile time
-genvar i, j;
+genvar i, j, k;
 
 ////////////////////////////////// FINITE STATE MACHINE ////////////////////////////////////////
 
@@ -213,7 +224,130 @@ generate
 	end
 endgenerate
 
-// Current X Value - 4x1 vector plus a 4x2 matrix times a 2x1 vector
+// Temp P Value - 4x4 matrix times a 4x4 matrix
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_temp_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_temp_cols
+			always @(posedge clk) begin
+				if (fsm_clear_tmp)		 			p_next_tmp[i][j] <= 'd0;
+				else if (fsm_curr == FSM_PREDICT_1) p_next_tmp[i][j] <= p_temp_sum3[i][j];
+				else								p_next_tmp[i][j] <= p_next_tmp[i][j];
+			end
+		end
+	end
+endgenerate
+
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_temp_mult_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_temp_mult_cols
+			for (k = 0; k < NUM_STATES; k = k + 1) begin: gen_p_temp_mult
+				qmult #(
+					.Q 				(ARCH_F),
+					.N 				(ARCH_W)
+				) mult_p_temp (
+			 		.i_multiplicand (f_mat[i][k]),
+			 		.i_multiplier	(p_curr[k][j]),
+			 		.o_result		(p_temp_mult[i][j][k])
+				);
+			end
+		end
+	end
+endgenerate
+
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_temp_add_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_temp_add_cols
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_p_temp1 (
+				.a 				(p_temp_mult[i][j][0]),
+				.b 				(p_temp_mult[i][j][1]),
+				.c 				(p_temp_sum1[i][j])
+			);
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_p_temp2 (
+				.a 				(p_temp_mult[i][j][2]),
+				.b 				(p_temp_mult[i][j][3]),
+				.c 				(p_temp_sum2[i][j])
+			);
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_p_temp3 (
+				.a 				(p_temp_sum1[i][j]),
+				.b 				(p_temp_sum2[i][j]),
+				.c 				(p_temp_sum3[i][j])
+			);			
+		end
+	end
+endgenerate
+
+// Next P Value - 4x4 matrix times a 4x4 transposed matrix, plus a 4x4 matrix
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_next_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_next_cols
+			always @(posedge clk) begin
+				if (fsm_clear_tmp)		 			p_next[i][j] <= 'd0;
+				else if (fsm_curr == FSM_PREDICT_2)	p_next[i][j] <= p_next_sum3[i][j];
+				else								p_next[i][j] <= p_next[i][j];
+			end
+		end
+	end
+endgenerate
+
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_next_mult_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_next_mult_cols
+			for (k = 0; k < NUM_STATES; k = k + 1) begin: gen_p_next_mult
+				qmult #(
+					.Q 				(ARCH_F),
+					.N 				(ARCH_W)
+				) mult_p_next (
+			 		.i_multiplicand (p_next_tmp[i][k]),
+			 		.i_multiplier	(f_mat[j][k]),
+			 		.o_result		(p_next_mult[i][j][k])
+				);
+			end
+		end
+	end
+endgenerate
+
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_next_add_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_next_add_cols
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_p_next1 (
+				.a 				(p_next_mult[i][j][0]),
+				.b 				(p_next_mult[i][j][1]),
+				.c 				(p_next_sum1[i][j])
+			);
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_p_next2 (
+				.a 				(p_next_mult[i][j][2]),
+				.b 				(p_next_mult[i][j][3]),
+				.c 				(p_next_sum2[i][j])
+			);
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_p_next3 (
+				.a 				(p_next_sum1[i][j]),
+				.b 				(p_next_sum2[i][j]),
+				.c 				(p_next_sum3[i][j])
+			);			
+		end
+	end
+endgenerate
+
+
+// Current X Value - Set to predicted value for initial testing
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_x_curr
 		always @(posedge clk) begin
@@ -224,43 +358,13 @@ generate
 	end
 endgenerate
 
-// Temp P Value - 4x4 matrix times a 4x4 matrix
-generate
-	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_temp_rows
-		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_temp_cols
-			always @(posedge clk) begin
-				if (fsm_clear_tmp)		 			p_next_tmp[i][j] <= 'd0;
-				else if (fsm_curr == FSM_PREDICT_1) p_next_tmp[i][j] <= 'bx;
-				else								p_next_tmp[i][j] <= p_next_tmp[i][j];
-			end
-		end
-	end
-endgenerate
-
-// MATH
-
-// Next P Value - 4x4 matrix times a 4x4 transposed matrix, plus a 4x4 matrix
-generate
-	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_next_rows
-		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_next_cols
-			always @(posedge clk) begin
-				if (fsm_clear_tmp)		 			p_next[i][j] <= 'd0;
-				else if (fsm_curr == FSM_PREDICT_2)	p_next[i][j] <= 'bx;
-				else								p_next[i][j] <= p_next[i][j];
-			end
-		end
-	end
-endgenerate
-
-// MATH
-
-// Current P Value - 4x4 weird reconstruction of K matrix (done above in p_helper) times a 4x4 matrix
+// Current P Value - Set to predicted value for initial testing
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_curr_rows
 		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_curr_cols
 			always @(posedge clk) begin
 				if (fsm_clear_all)		 			p_curr[i][j] <= p_init[i][j];
-				else if (fsm_curr == FSM_UPDATE) 	p_curr[i][j] <= 'bx;
+				else if (fsm_curr == FSM_UPDATE) 	p_curr[i][j] <= p_next[i][j];
 				else								p_curr[i][j] <= p_curr[i][j];
 			end
 		end

@@ -8,6 +8,9 @@ add wave -logic ready
 add wave -logic -radix unsigned myKalman/fsm_curr
 add wave -logic -radix unsigned myKalman/x_next
 add wave -logic -radix unsigned myKalman/x_curr
+add wave -logic -radix unsigned myKalman/p_next
+add wave -logic -radix unsigned myKalman/p_next_tmp
+add wave -logic -radix unsigned myKalman/p_curr
 add wave -logic -radix unsigned myKalman/z_x_new
 add wave -logic -radix unsigned myKalman/z_y_new
 
