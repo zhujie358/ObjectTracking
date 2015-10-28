@@ -67,31 +67,31 @@ localparam T_STEP_FI 	 = 1; 		   // round(0.0155 << FRAC)
 /////////////////////////////// INTERNAL SIGNALS & VARIABLES ///////////////////////////////////
 
 // Finite State Machine
-reg [(FSM_WIDTH-1):0]	fsm_curr;
-reg [(FSM_WIDTH-1):0]	fsm_next;
-wire 					fsm_clear_all;
-wire 					fsm_clear_tmp;
+reg 		[(FSM_WIDTH-1):0]	fsm_curr;
+reg 		[(FSM_WIDTH-1):0]	fsm_next;
+wire 							fsm_clear_all;
+wire 							fsm_clear_tmp;
 
 // Static Matrices
-wire [(ARCH_W-1):0]		x_init	   [0:NUM_STATES-1];
-wire [(ARCH_W-1):0]		p_init	   [0:NUM_STATES-1][0:NUM_STATES-1];
-wire [(ARCH_W-1):0] 	f_mat 	   [0:NUM_STATES-1][0:NUM_STATES-1];
-wire [(ARCH_W-1):0]		q_mat 	   [0:NUM_STATES-1][0:NUM_STATES-1];
-wire [(ARCH_W-1):0] 	r_mat 	   [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-wire [(ARCH_W-1):0]		p_helper   [0:NUM_STATES-1][0:NUM_STATES-1];
-wire [(ARCH_W-1):0]		s_det;
+wire 		[(ARCH_W-1):0]		x_init	   [0:NUM_STATES-1];
+wire 		[(ARCH_W-1):0]		p_init	   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire 		[(ARCH_W-1):0] 		f_mat 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire 		[(ARCH_W-1):0]		q_mat 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire 		[(ARCH_W-1):0] 		r_mat 	   [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire signed [(ARCH_W-1):0]		p_helper   [0:NUM_STATES-1][0:NUM_STATES-1];
+wire signed [(ARCH_W-1):0]		s_det;
 
 // Dynamic Matrices and Vectors
-reg  [(ARCH_W-1):0]		x_curr 	   [0:NUM_STATES-1];
-reg  [(ARCH_W-1):0]		x_next 	   [0:NUM_STATES-1];
-reg  [(ARCH_W-1):0]		p_curr 	   [0:NUM_STATES-1][0:NUM_STATES-1];
-reg  [(ARCH_W-1):0]		p_next_tmp [0:NUM_STATES-1][0:NUM_STATES-1];
-reg  [(ARCH_W-1):0]		p_next 	   [0:NUM_STATES-1][0:NUM_STATES-1];
-reg  [(ARCH_W-1):0]		z_vec	   [0:NUM_MEASUR-1];
-reg  [(ARCH_W-1):0] 	y_vec	   [0:NUM_MEASUR-1];
-reg  [(ARCH_W-1):0]		s_mat	   [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-reg  [(ARCH_W-1):0]		s_mat_inv  [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-reg  [(ARCH_W-1):0]		k_mat 	   [0:NUM_STATES-1][0:NUM_MEASUR-1];
+reg  		[(ARCH_W-1):0]		x_curr 	   [0:NUM_STATES-1];
+reg  		[(ARCH_W-1):0]		x_next 	   [0:NUM_STATES-1];
+reg  signed [(ARCH_W-1):0]		p_curr 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+reg  signed [(ARCH_W-1):0]		p_next_tmp [0:NUM_STATES-1][0:NUM_STATES-1];
+reg  signed [(ARCH_W-1):0]		p_next 	   [0:NUM_STATES-1][0:NUM_STATES-1];
+reg   		[(ARCH_W-1):0]		z_vec	   [0:NUM_MEASUR-1];
+reg  signed [(ARCH_W-1):0] 		y_vec	   [0:NUM_MEASUR-1];
+reg  signed [(ARCH_W-1):0]		s_mat	   [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+reg  signed [(ARCH_W-1):0]		s_mat_inv  [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+reg  signed [(ARCH_W-1):0]		k_mat 	   [0:NUM_STATES-1][0:NUM_MEASUR-1];
 
 // Loops that get rolled out on compile time
 genvar i, j;
