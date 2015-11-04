@@ -6,11 +6,13 @@ add wave -logic rst_n
 add wave -logic valid
 add wave -logic ready
 add wave -logic -radix unsigned myKalman/fsm_curr
+add wave -logic -radix unsigned myKalman/z_vec
 add wave -logic -radix unsigned myKalman/x_next
 add wave -logic -radix unsigned myKalman/x_curr
 add wave -logic -radix unsigned myKalman/p_next
 add wave -logic -radix unsigned myKalman/p_next_tmp
 add wave -logic -radix unsigned myKalman/p_curr
+add wave -logic -radix unsigned myKalman/y_vec
 add wave -logic -radix unsigned myKalman/z_x_new
 add wave -logic -radix unsigned myKalman/z_y_new
 

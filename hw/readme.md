@@ -15,6 +15,7 @@ Order | Name | Goal | Status
 5 | `rgb_to_grayscale`| Write a Verilog module that implements the RGB to grayscale equation from software. Scale the colour coefficients to their fixed point values. Test in functional simulation to ensure equation works properly.| Complete
 6 | `new_pipeline_2` | Integrate the SRAM controller and the RGB to grayscale modules into the video pipeline. The goal is to latch a specific frame using a button on the DE2, and store that frame in the SRAM. Then, the RGB to grayscale module will be used to produce the delta frame on the VGA display. | Complete
 7 | `measure` | Convert `../sw/measure.m`, or a similar algorithm that produces a (x,y) coordinate from the delta frame, to hardware. This can be verified in hardware by also writing a Verilog module to color the (x,y) and the surrounding area red. | Complete
+8 | `kalman_filter` | Implment the Kalman filter equations in hardware. The module will take the meausred (x,y) position and produce an improved (x',y') position based on the theoretical model and covariance matrix. | In progress
 
 ## Creating a New Experiment
 A new experiment (that works with the Makefile flow) can be created by following these steps:

@@ -46,7 +46,8 @@ localparam FSM_INIT		 = 0;
 localparam FSM_IDLE      = 1;
 localparam FSM_PREDICT_1 = 2;
 localparam FSM_PREDICT_2 = 3;
-localparam FSM_UPDATE    = 4;
+localparam FSM_INTERIM_1 = 4;
+localparam FSM_UPDATE    = 5;
 
 // Architecture
 localparam ARCH_W 		= 32;
@@ -57,15 +58,15 @@ localparam NUM_STATES 	= 4;
 localparam NUM_MEASUR 	= 2;
 
 // Fixed Point Values - sign | integer | fraction
-localparam ONE_FI 		= ('b0 << ARCH_W) | ('b1 << (ARCH_W-ARCH_F-2)) | 'b0;
-localparam TSTEP_FI 	= ('b0 << ARCH_W) | ('b0 << (ARCH_W-ARCH_F-2)) | 'b000000111111100;
-localparam RDIAG_FI     = ('b0 << ARCH_W) | ('d1000 << (ARCH_W-ARCH_F-2)) | 'b0; 
+localparam ONE_FI 		= ('b0 << (ARCH_W-1)) | ('b1 << (ARCH_W-ARCH_F-2)) | 'b0;
+localparam TSTEP_FI 	= ('b0 << (ARCH_W-1)) | ('b0 << (ARCH_W-ARCH_F-2)) | 'b000000111111100;
+localparam RDIAG_FI     = ('b0 << (ARCH_W-1)) | ('d1000 << (ARCH_W-ARCH_F-2)) | 'b0; 
 
 /////////////////////////////// INTERNAL SIGNALS & VARIABLES ///////////////////////////////////
 
 // Finite State Machine
-reg [(FSM_WIDTH-1):0]	fsm_curr;
-reg [(FSM_WIDTH-1):0]	fsm_next;
+reg  [(FSM_WIDTH-1):0]	fsm_curr;
+reg  [(FSM_WIDTH-1):0]	fsm_next;
 wire 					fsm_clear_all;
 wire 					fsm_clear_tmp;
 
@@ -75,6 +76,9 @@ wire [(ARCH_W-1):0]		p_init	    [0:NUM_STATES-1][0:NUM_STATES-1];
 wire [(ARCH_W-1):0] 	f_mat 	    [0:NUM_STATES-1][0:NUM_STATES-1];
 wire [(ARCH_W-1):0]		q_mat 	    [0:NUM_STATES-1][0:NUM_STATES-1];
 wire [(ARCH_W-1):0] 	r_mat 	    [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+
+// Measurement Vector
+reg  [(ARCH_W)-1:0]		z_vec		[0:NUM_MEASUR-1];
 
 // State Vector
 reg  [(ARCH_W-1):0]		x_curr		[0:NUM_STATES-1];
@@ -88,18 +92,22 @@ wire [(ARCH_W-1):0]		x_next_sum3 [0:NUM_STATES-1];
 // Covariance Matrix
 reg  [(ARCH_W-1):0]		p_curr		[0:NUM_STATES-1][0:NUM_STATES-1];
 
-reg  [(ARCH_W-1):0]		p_next 	    [0:NUM_STATES-1][0:NUM_STATES-1];
+reg   [(ARCH_W-1):0]	p_next 	    [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_next_mult [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_next_sum1 [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_next_sum2 [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_next_sum3 [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_next_sum4 [0:NUM_STATES-1][0:NUM_STATES-1];
 
-reg  [(ARCH_W-1):0]		p_next_tmp  [0:NUM_STATES-1][0:NUM_STATES-1];
+reg   [(ARCH_W-1):0]	p_next_tmp  [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_temp_mult [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_temp_sum1 [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_temp_sum2 [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_temp_sum3 [0:NUM_STATES-1][0:NUM_STATES-1];
+
+// Measurement-Predictation Error
+wire  [(ARCH_W-1):0]	y_sub		[0:NUM_MEASUR-1];
+reg	  [(ARCH_W-1):0]	y_vec		[0:NUM_MEASUR-1];
 
 // Loops that get rolled out on compile time
 genvar i, j, k;
@@ -118,7 +126,8 @@ always @* begin
 		FSM_INIT 	  : fsm_next = FSM_IDLE;
 		FSM_IDLE 	  : fsm_next = valid ? FSM_PREDICT_1 : FSM_IDLE;
 		FSM_PREDICT_1 : fsm_next = FSM_PREDICT_2;
-		FSM_PREDICT_2 : fsm_next = FSM_UPDATE;
+		FSM_PREDICT_2 : fsm_next = FSM_INTERIM_1;
+		FSM_INTERIM_1 : fsm_next = FSM_UPDATE;
 		FSM_UPDATE    : fsm_next = FSM_IDLE;
 		default       : fsm_next = FSM_INIT;
 	endcase 
@@ -169,6 +178,26 @@ generate
 endgenerate
 
 //////////////////////////////// DYNAMIC MATRICES AND VECTORS //////////////////////////////////
+
+// Measurement Vector - 2x1 vector latched when valid data arrives
+always @(posedge clk or negedge aresetn) begin
+	if (~aresetn) 
+		begin
+			z_vec[0] <= 'd0;
+			z_vec[1] <= 'd0;
+		end
+	// Latch values and scale to match x_next precision - put in fixed-point format
+ 	else if (ready & valid)	
+ 		begin
+ 			z_vec[0] <= ('b0 << (ARCH_W-1)) | (z_x << (ARCH_W-ARCH_F-2)) | 'b0;
+ 			z_vec[1] <= ('b0 << (ARCH_W-1)) | (z_y << (ARCH_W-ARCH_F-2)) | 'b0;
+ 		end
+ 	else 
+ 		begin
+ 			z_vec[0] <= z_vec[0];
+ 			z_vec[1] <= z_vec[1];
+ 		end
+end
 
 // Next X Value - 4x4 matrix times a 4x1 vector
 generate
@@ -352,6 +381,31 @@ generate
 				.b 				(q_mat[i][j]),
 				.c 				(p_next_sum4[i][j])
 			);							
+		end
+	end
+endgenerate
+
+// Y Vector - 2x1 vector minus a 2x1 vector
+generate
+	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: gen_y_sub
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) sub_y_vec (
+				.a 				(z_vec[i]),
+				// Flip the sign bit to get subtraction
+				.b 				(x_next[i] ^ {1'b1, {(ARCH_W-1){1'b0}}}),
+				.c 				(y_sub[i])
+			);
+	end
+endgenerate
+
+generate 
+	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: gen_y_vec
+		always @(posedge clk) begin
+			if (fsm_clear_tmp)					y_vec[i] <= 'd0;
+			else if (fsm_curr == FSM_INTERIM_1) y_vec[i] <= y_sub[i];
+			else								y_vec[i] <= y_vec[i];
 		end
 	end
 endgenerate
