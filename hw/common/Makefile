@@ -53,6 +53,6 @@ hw_all:
 simulate:
 	vlib  work
 	# Append other Verilog needed for sim in this line
-	vlog  ./sim/testbench.sv ./kalman.v ../common/fixed_point/qadd.v ../common/fixed_point/qmult.v
+	vlog  ./sim/testbench.sv ./kalman.v ../common/fixed_point/qadd.v ../common/fixed_point/qmult.v ../common/fixed_point/qdiv.v
 	modelsim -do sim/signals.do
 	touch simulate

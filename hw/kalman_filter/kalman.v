@@ -41,13 +41,15 @@ module kalman #(
 ////////////////////////////////////// PARAMETERS //////////////////////////////////////////////
 
 // Finite State Machine
-localparam FSM_WIDTH 	 = 3;
+localparam FSM_WIDTH 	 = 4;
 localparam FSM_INIT		 = 0;
 localparam FSM_IDLE      = 1;
 localparam FSM_PREDICT_1 = 2;
 localparam FSM_PREDICT_2 = 3;
 localparam FSM_INTERIM_1 = 4;
-localparam FSM_UPDATE    = 5;
+localparam FSM_INTERIM_2 = 5;
+localparam FSM_BUFFER    = 6;
+localparam FSM_UPDATE    = 7;
 
 // Architecture
 localparam ARCH_W 		= 32;
@@ -58,6 +60,7 @@ localparam NUM_STATES 	= 4;
 localparam NUM_MEASUR 	= 2;
 
 // Fixed Point Values - sign | integer | fraction
+localparam FLIP_SIGN    = {1'b1, {(ARCH_W-1){1'b0}}};
 localparam ONE_FI 		= ('b0 << (ARCH_W-1)) | ('b1 << (ARCH_W-ARCH_F-2)) | 'b0;
 localparam TSTEP_FI 	= ('b0 << (ARCH_W-1)) | ('b0 << (ARCH_W-ARCH_F-2)) | 'b000000111111100;
 localparam RDIAG_FI     = ('b0 << (ARCH_W-1)) | ('d1000 << (ARCH_W-ARCH_F-2)) | 'b0; 
@@ -69,6 +72,7 @@ reg  [(FSM_WIDTH-1):0]	fsm_curr;
 reg  [(FSM_WIDTH-1):0]	fsm_next;
 wire 					fsm_clear_all;
 wire 					fsm_clear_tmp;
+wire 					division_done;
 
 // Static Matrices
 wire [(ARCH_W-1):0]		x_init	    [0:NUM_STATES-1];
@@ -109,6 +113,16 @@ wire  [(ARCH_W-1):0]	p_temp_sum3 [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	y_sub		[0:NUM_MEASUR-1];
 reg	  [(ARCH_W-1):0]	y_vec		[0:NUM_MEASUR-1];
 
+// Residual Covariance
+wire  [(ARCH_W-1):0]	s_add 		[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+reg   [(ARCH_W-1):0]	s_mat 		[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W-1):0] 	s_det_prod_1;
+wire  [(ARCH_W-1):0] 	s_det_prod_2;
+wire  [(ARCH_W-1):0] 	s_det;
+wire  [(ARCH_W-1):0]	s_inv_tmp 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W-1):0]	s_inv_tmp2 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+reg   [(ARCH_W-1):0]	s_inv 	 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+ 
 // Loops that get rolled out on compile time
 genvar i, j, k;
 
@@ -127,7 +141,9 @@ always @* begin
 		FSM_IDLE 	  : fsm_next = valid ? FSM_PREDICT_1 : FSM_IDLE;
 		FSM_PREDICT_1 : fsm_next = FSM_PREDICT_2;
 		FSM_PREDICT_2 : fsm_next = FSM_INTERIM_1;
-		FSM_INTERIM_1 : fsm_next = FSM_UPDATE;
+		FSM_INTERIM_1 : fsm_next = FSM_INTERIM_2;
+		FSM_INTERIM_2 : fsm_next = FSM_BUFFER;
+		FSM_BUFFER    : fsm_next = division_done ? FSM_UPDATE : FSM_BUFFER;
 		FSM_UPDATE    : fsm_next = FSM_IDLE;
 		default       : fsm_next = FSM_INIT;
 	endcase 
@@ -394,7 +410,7 @@ generate
 			) sub_y_vec (
 				.a 				(z_vec[i]),
 				// Flip the sign bit to get subtraction
-				.b 				(x_next[i] ^ {1'b1, {(ARCH_W-1){1'b0}}}),
+				.b 				(x_next[i] ^ FLIP_SIGN),
 				.c 				(y_sub[i])
 			);
 	end
@@ -409,6 +425,108 @@ generate
 		end
 	end
 endgenerate
+
+// S Matrix - 2x2 matrix (top left corner of p_next) plus the R matrix
+generate
+	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: gen_s_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: gen_s_cols
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) s_mat_add (
+				.a 				(p_next[i][j]),
+				.b 				(r_mat[i][j]),
+				.c  			(s_add[i][j])
+			);
+		end
+	end
+endgenerate
+
+generate 
+	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: gen_s_mat_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: gen_s_mat_cols
+			always @(posedge clk) begin
+				if (fsm_clear_tmp)					s_mat[i][j] <= 'd0;
+				else if (fsm_curr == FSM_INTERIM_1) s_mat[i][j] <= s_add[i][j];
+				else								s_mat[i][j] <= s_mat[i][j];
+			end
+		end
+	end
+endgenerate
+
+// Invert S - 2x2 matrix so swap positions, flip signs, and divide by determinant
+qmult #(
+	.Q 				(ARCH_F),
+	.N 				(ARCH_W)
+) det_product_1 (
+		.i_multiplicand (s_mat[0][0]),
+		.i_multiplier	(s_mat[1][1]),
+		.o_result		(s_det_prod_1)
+);
+qmult #(
+	.Q 				(ARCH_F),
+	.N 				(ARCH_W)
+) det_product_2 (
+		.i_multiplicand (s_mat[0][1]),
+		.i_multiplier	(s_mat[1][0]),
+		.o_result		(s_det_prod_2)
+);
+qadd #(
+	.Q 				(ARCH_F),
+	.N 				(ARCH_W)
+) det_sub (
+	.a 				(s_det_prod_1),
+	// Flip the sign bit to get subtraction
+	.b 				(s_det_prod_2 ^ FLIP_SIGN),
+	.c  			(s_det)
+);
+
+assign s_inv_tmp[0][0] = s_mat[1][1];
+assign s_inv_tmp[1][1] = s_mat[0][0];
+assign s_inv_tmp[0][1] = ~(&s_mat[0][1]) ? s_mat[0][1] : s_mat[0][1] ^ FLIP_SIGN;
+assign s_inv_tmp[1][0] = ~(&s_mat[1][0]) ? s_mat[1][0] : s_mat[1][0] ^ FLIP_SIGN;
+
+generate
+	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: s_inv_tmp_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: s_inv_tmp_cols
+		qdiv#(
+			.Q 			(ARCH_F),
+			.N 			(ARCH_W)
+		) s_inv_div (
+			// Input Control
+			.i_clk      	(clk),
+			.i_start 		(fsm_curr == FSM_INTERIM_2),
+
+			// Input Data
+			.i_dividend 	(s_inv_tmp[i][j]),
+			.i_divisor  	(s_det),
+
+			// Output Control
+			.o_complete		(division_done),
+
+			// Output Data
+			.o_quotient_out (s_inv_tmp2[i][j])
+
+		);
+		end
+	end
+endgenerate
+
+generate
+	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: s_inv_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: s_inv_cols
+			always @(posedge clk) begin
+				if (fsm_clear_tmp) 									s_inv[i][j] <= 'd0;
+				else if ((fsm_curr == FSM_BUFFER) & division_done)  s_inv[i][j] <= s_inv_tmp2[i][j];
+				else 												s_inv[i][j] <= s_inv[i][j];
+			end
+		end
+	end
+endgenerate
+
+// K Matrix
+
+// TODO
 
 // Current X Value - Set to predicted value for initial testing
 generate
