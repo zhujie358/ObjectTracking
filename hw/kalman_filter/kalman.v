@@ -11,16 +11,12 @@
 	filter without 4 states and 2 measurements The rest of the code cannot be. The matrix 
 	equations are written out with the specific lengths in mind to avoid non-synth code. 
 
-	Furthemore, the H matrix has been removed entirely to provide unnecessary math. Since the
+	Furthermore, the H matrix has been removed entirely to provide unnecessary math. Since the
 	H matrix is just converting 4 states --> 2 measurements, it just plucks out specific values
 	when it is multiplied by another matrix. To make life, hardware, and coding easier - the 
 	plucking is hard coded, and not done with multiplication.
 
-	A simple description of the FSM is as follows: The Kalman filter chills in idle state, constantly
-	pumping out the most recent (x,y) value. When the valid signal goes high, it signifies that a new
-	measurement has arrived - and starts the computations. The FSM walks through the computations, since
-	only some can be done in parallel, and the rest have to be done in series. When its finished, it updates
-	the (x,y) value and goes back to chilling in idle.
+	A simple description of the FSM is as follows: 
 */
 
 module kalman #(
@@ -75,6 +71,10 @@ wire 					fsm_clear_all;
 wire 					fsm_clear_tmp;
 wire 					division_done;
 
+// Output Wrappers
+wire [(ARCH_W-1):0] 	z_x_new_int; 
+wire [(ARCH_W-1):0] 	z_y_new_int; 
+
 // Static Matrices
 wire [(ARCH_W-1):0]		x_init	    [0:NUM_STATES-1];
 wire [(ARCH_W-1):0]		p_init	    [0:NUM_STATES-1][0:NUM_STATES-1];
@@ -85,18 +85,28 @@ wire [(ARCH_W-1):0] 	r_mat 	    [0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 // Measurement Vector
 reg  [(ARCH_W)-1:0]		z_vec		[0:NUM_MEASUR-1];
 
-// State Vector
+// State Vector - Actual
 reg  [(ARCH_W-1):0]		x_curr		[0:NUM_STATES-1];
+wire [(ARCH_W-1):0]		x_curr_mult [0:NUM_STATES-1][0:NUM_MEASUR-1];
+wire [(ARCH_W-1):0]		x_curr_sum1 [0:NUM_STATES-1];
+wire [(ARCH_W-1):0]		x_curr_sum2 [0:NUM_STATES-1];
 
+// State Vector - Predicted
 reg  [(ARCH_W-1):0]		x_next 	    [0:NUM_STATES-1];
 wire [(ARCH_W-1):0]		x_next_mult [0:NUM_STATES-1][0:NUM_STATES-1];
 wire [(ARCH_W-1):0]		x_next_sum1 [0:NUM_STATES-1];
 wire [(ARCH_W-1):0]		x_next_sum2 [0:NUM_STATES-1];
 wire [(ARCH_W-1):0]		x_next_sum3 [0:NUM_STATES-1];
 
-// Covariance Matrix
+// Covariance Matrix - Actual
 reg  [(ARCH_W-1):0]		p_curr		[0:NUM_STATES-1][0:NUM_STATES-1];
+wire [(ARCH_W-1):0]		p_curr_diff [0:NUM_STATES-1][0:NUM_STATES-1];
+wire [(ARCH_W-1):0]		p_curr_mult [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1];
+wire [(ARCH_W-1):0]		p_curr_sum1 [0:NUM_STATES-1][0:NUM_STATES-1];
+wire [(ARCH_W-1):0]		p_curr_sum2 [0:NUM_STATES-1][0:NUM_STATES-1];
+wire [(ARCH_W-1):0]		p_curr_sum3 [0:NUM_STATES-1][0:NUM_STATES-1];
 
+// Covariance Matrix - Predicted
 reg   [(ARCH_W-1):0]	p_next 	    [0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_next_mult [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1];
 wire  [(ARCH_W-1):0]	p_next_sum1 [0:NUM_STATES-1][0:NUM_STATES-1];
@@ -128,6 +138,7 @@ reg   [(ARCH_W-1):0]	s_inv 	 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 wire  [(ARCH_W-1):0]	k_mat_mult	[0:NUM_STATES-1][0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 wire  [(ARCH_W-1):0]	k_mat_sum	[0:NUM_STATES-1][0:NUM_MEASUR-1];
 reg   [(ARCH_W-1):0]	k_mat		[0:NUM_STATES-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W-1):0]	k_special   [0:NUM_STATES-1][0:NUM_STATES-1];
 
 // Loops that get rolled out on compile time
 genvar i, j, k;
@@ -200,6 +211,16 @@ generate
 	end
 endgenerate
 
+// Set k_special to the reconstruction of k_mat
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: k_special_gen_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: k_special_gen_cols
+			if (j < 2)	assign k_special[i][j] = k_mat[i][j];
+			else		assign k_special[i][j] = 'd0;
+		end
+	end 
+endgenerate
+
 //////////////////////////////// DYNAMIC MATRICES AND VECTORS //////////////////////////////////
 
 // Measurement Vector - 2x1 vector latched when valid data arrives
@@ -223,16 +244,6 @@ always @(posedge clk or negedge aresetn) begin
 end
 
 // Next X Value - 4x4 matrix times a 4x1 vector
-generate
-	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_x_next
-		always @(posedge clk) begin
-			if (fsm_clear_tmp) 					x_next[i] <= 'd0;
-			else if (fsm_curr == FSM_PREDICT_1)	x_next[i] <= x_next_sum3[i];
-			else								x_next[i] <= x_next[i];
-		end
-	end
-endgenerate
-
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_x_mult_modules_row
 		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_x_mult_modules_col
@@ -277,19 +288,17 @@ generate
 	end
 endgenerate
 
-// Temp P Value - 4x4 matrix times a 4x4 matrix
 generate
-	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_temp_rows
-		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_temp_cols
-			always @(posedge clk) begin
-				if (fsm_clear_tmp)		 			p_next_tmp[i][j] <= 'd0;
-				else if (fsm_curr == FSM_PREDICT_1) p_next_tmp[i][j] <= p_temp_sum3[i][j];
-				else								p_next_tmp[i][j] <= p_next_tmp[i][j];
-			end
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_x_next
+		always @(posedge clk) begin
+			if (fsm_clear_tmp) 					x_next[i] <= 'd0;
+			else if (fsm_curr == FSM_PREDICT_1)	x_next[i] <= x_next_sum3[i];
+			else								x_next[i] <= x_next[i];
 		end
 	end
 endgenerate
 
+// Temp P Value - 4x4 matrix times a 4x4 matrix
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_temp_mult_rows
 		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_temp_mult_cols
@@ -338,19 +347,19 @@ generate
 	end
 endgenerate
 
-// Next P Value - 4x4 matrix times a 4x4 transposed matrix, plus a 4x4 matrix
 generate
-	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_next_rows
-		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_next_cols
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_temp_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_temp_cols
 			always @(posedge clk) begin
-				if (fsm_clear_tmp)		 			p_next[i][j] <= 'd0;
-				else if (fsm_curr == FSM_PREDICT_2)	p_next[i][j] <= p_next_sum4[i][j];
-				else								p_next[i][j] <= p_next[i][j];
+				if (fsm_clear_tmp)		 			p_next_tmp[i][j] <= 'd0;
+				else if (fsm_curr == FSM_PREDICT_1) p_next_tmp[i][j] <= p_temp_sum3[i][j];
+				else								p_next_tmp[i][j] <= p_next_tmp[i][j];
 			end
 		end
 	end
 endgenerate
 
+// Next P Value - 4x4 matrix times a 4x4 transposed matrix, plus a 4x4 matrix
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_next_mult_rows
 		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_next_mult_cols
@@ -408,6 +417,18 @@ generate
 	end
 endgenerate
 
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_next_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_next_cols
+			always @(posedge clk) begin
+				if (fsm_clear_tmp)		 			p_next[i][j] <= 'd0;
+				else if (fsm_curr == FSM_PREDICT_2)	p_next[i][j] <= p_next_sum4[i][j];
+				else								p_next[i][j] <= p_next[i][j];
+			end
+		end
+	end
+endgenerate
+
 // Y Vector - 2x1 vector minus a 2x1 vector
 generate
 	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: gen_y_sub
@@ -416,8 +437,8 @@ generate
 				.N 				(ARCH_W)
 			) sub_y_vec (
 				.a 				(z_vec[i]),
-				// Flip the sign bit to get subtraction
-				.b 				(x_next[i] ^ FLIP_SIGN),
+				// Flip the sign bit to get subtraction (unless its zero)
+				.b 				(~(&x_next[i]) ? x_next[i] : x_next[i] ^ FLIP_SIGN),
 				.c 				(y_sub[i])
 			);
 	end
@@ -483,8 +504,8 @@ qadd #(
 	.N 				(ARCH_W)
 ) det_sub (
 	.a 				(s_det_prod_1),
-	// Flip the sign bit to get subtraction
-	.b 				(s_det_prod_2 ^ FLIP_SIGN),
+	// Flip the sign bit to get subtraction (unless its zero)
+	.b 				(~(&s_det_prod_2) ? s_det_prod_2 : s_det_prod_2 ^ FLIP_SIGN),
 	.c  			(s_det)
 );
 
@@ -559,7 +580,7 @@ generate
 				.a 				(k_mat_mult[i][j][0]),
 				.b 				(k_mat_mult[i][j][1]),
 				.c 				(k_mat_sum[i][j])
-			);		
+			);
 		end
 	end
 endgenerate
@@ -576,24 +597,127 @@ generate
 	end
 endgenerate
 
-// Current X Value - Set to predicted value for initial testing
+// Current X Value - 4x2 matrix times a 2x2 matrix plus a 4x1 vector
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: x_curr_mult_gen_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: x_curr_mult_gen_cols
+			qmult #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) mult_x_curr (
+		 		.i_multiplicand (k_mat[i][j]),
+		 		.i_multiplier	(y_vec[j]),
+		 		.o_result		(x_curr_mult[i][j])
+			);			
+		end
+	end
+endgenerate
+
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: x_curr_sum_gen
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) sum_x_curr1 (
+				.a 				(x_curr_mult[i][0]),
+				.b 				(x_curr_mult[i][1]),
+				.c 				(x_curr_sum1[i])
+			);
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) sum_x_curr2 (
+				.a 				(x_next[i]),
+				.b 				(x_curr_sum1[i]),
+				.c 				(x_curr_sum2[i])
+			);		
+	end
+endgenerate
+
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_x_curr
 		always @(posedge clk) begin
+			// Hold value between iterations
 			if (fsm_clear_all)		 			x_curr[i] <= x_init[i];
-			else if (fsm_curr == FSM_UPDATE)	x_curr[i] <= x_next[i];
+			else if (fsm_curr == FSM_UPDATE)	x_curr[i] <= x_curr_sum2[i];
 			else 								x_curr[i] <= x_curr[i];
 		end
 	end
 endgenerate
 
-// Current P Value - Set to predicted value for initial testing
+// Current P Value - 4x4 identity minus a 4x4 reconstruction of k_mat, multiplied by p_next
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: p_curr_diff_gen_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: p_curr_diff_gen_cols
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) diff_p_curr (
+				// Since p_init is the 4x4 identity we can use it here instead of making a new identity
+				.a 				(p_init[i][j]),
+				// Flip sign to get difference (unless its zero, then don't flip the sign)
+				.b 				(~(&k_special[i][j]) ? k_special[i][j] : k_special[i][j] ^ FLIP_SIGN),
+				.c 				(p_curr_diff[i][j])
+			);
+		end
+	end
+endgenerate
+
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_curr_mult_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_curr_mult_cols
+			for (k = 0; k < NUM_STATES; k = k + 1) begin: gen_p_curr_mult
+				qmult #(
+					.Q 				(ARCH_F),
+					.N 				(ARCH_W)
+				) mult_p_curr (
+			 		.i_multiplicand (p_curr_diff[i][k]),
+			 		.i_multiplier	(p_next[k][j]),
+			 		.o_result		(p_curr_mult[i][j][k])
+				);
+			end
+		end
+	end
+endgenerate
+
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_curr_sum_rows
+		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_curr_sum_cols
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_p_curr1 (
+				.a 				(p_curr_mult[i][j][0]),
+				.b 				(p_curr_mult[i][j][1]),
+				.c 				(p_curr_sum1[i][j])
+			);
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_p_curr2 (
+				.a 				(p_curr_mult[i][j][2]),
+				.b 				(p_curr_mult[i][j][3]),
+				.c 				(p_curr_sum2[i][j])
+			);
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_p_curr3 (
+				.a 				(p_curr_sum1[i][j]),
+				.b 				(p_curr_sum2[i][j]),
+				.c 				(p_curr_sum3[i][j])
+			);			
+		end
+	end
+endgenerate
+
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_p_curr_rows
 		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_p_curr_cols
 			always @(posedge clk) begin
+				// Hold value between iterations
 				if (fsm_clear_all)		 			p_curr[i][j] <= p_init[i][j];
-				else if (fsm_curr == FSM_UPDATE) 	p_curr[i][j] <= p_next[i][j];
+				else if (fsm_curr == FSM_UPDATE) 	p_curr[i][j] <= p_curr_sum3[i][j];
 				else								p_curr[i][j] <= p_curr[i][j];
 			end
 		end
@@ -601,9 +725,9 @@ generate
 endgenerate
 
 // Generate Outputs
-wire [(ARCH_W-1):0] strange_1 = x_curr[0];
-wire [(ARCH_W-1):0] strange_2 = x_curr[1];
-assign z_x_new = strange_1[(ARCH_F+DISP_WIDTH):ARCH_F];
-assign z_y_new = strange_2[(ARCH_F+DISP_WIDTH):ARCH_F];
+assign z_x_new_int = x_curr[0];
+assign z_y_new_int = x_curr[1];
+assign z_x_new = z_x_new_int[(ARCH_F+DISP_WIDTH):ARCH_F];
+assign z_y_new = z_y_new_int[(ARCH_F+DISP_WIDTH):ARCH_F];
 
 endmodule
