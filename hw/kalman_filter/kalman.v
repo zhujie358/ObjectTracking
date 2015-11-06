@@ -48,8 +48,9 @@ localparam FSM_PREDICT_1 = 2;
 localparam FSM_PREDICT_2 = 3;
 localparam FSM_INTERIM_1 = 4;
 localparam FSM_INTERIM_2 = 5;
-localparam FSM_BUFFER    = 6;
-localparam FSM_UPDATE    = 7;
+localparam FSM_DIVIDE    = 6;
+localparam FSM_INTERIM_3 = 7;
+localparam FSM_UPDATE    = 8;
 
 // Architecture
 localparam ARCH_W 		= 32;
@@ -122,7 +123,12 @@ wire  [(ARCH_W-1):0] 	s_det;
 wire  [(ARCH_W-1):0]	s_inv_tmp 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 wire  [(ARCH_W-1):0]	s_inv_tmp2 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 reg   [(ARCH_W-1):0]	s_inv 	 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
- 
+
+// Optimal Kalman Gain 
+wire  [(ARCH_W-1):0]	k_mat_mult	[0:NUM_STATES-1][0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W-1):0]	k_mat_sum	[0:NUM_STATES-1][0:NUM_MEASUR-1];
+reg   [(ARCH_W-1):0]	k_mat		[0:NUM_STATES-1][0:NUM_MEASUR-1];
+
 // Loops that get rolled out on compile time
 genvar i, j, k;
 
@@ -142,8 +148,9 @@ always @* begin
 		FSM_PREDICT_1 : fsm_next = FSM_PREDICT_2;
 		FSM_PREDICT_2 : fsm_next = FSM_INTERIM_1;
 		FSM_INTERIM_1 : fsm_next = FSM_INTERIM_2;
-		FSM_INTERIM_2 : fsm_next = FSM_BUFFER;
-		FSM_BUFFER    : fsm_next = division_done ? FSM_UPDATE : FSM_BUFFER;
+		FSM_INTERIM_2 : fsm_next = FSM_DIVIDE;
+		FSM_DIVIDE    : fsm_next = division_done ? FSM_INTERIM_3 : FSM_DIVIDE;
+		FSM_INTERIM_3 : fsm_next = FSM_UPDATE;
 		FSM_UPDATE    : fsm_next = FSM_IDLE;
 		default       : fsm_next = FSM_INIT;
 	endcase 
@@ -517,16 +524,57 @@ generate
 		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: s_inv_cols
 			always @(posedge clk) begin
 				if (fsm_clear_tmp) 									s_inv[i][j] <= 'd0;
-				else if ((fsm_curr == FSM_BUFFER) & division_done)  s_inv[i][j] <= s_inv_tmp2[i][j];
+				else if ((fsm_curr == FSM_DIVIDE) & division_done)  s_inv[i][j] <= s_inv_tmp2[i][j];
 				else 												s_inv[i][j] <= s_inv[i][j];
 			end
 		end
 	end
 endgenerate
 
-// K Matrix
+// K Matrix - 4x2 matrix (left half of p_next) times a 2x2 matrix (s inverse)
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_k_mult_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: gen_k_mult_cols
+			for (k = 0; k < NUM_MEASUR; k = k + 1) begin: gen_k_mult
+				qmult #(
+					.Q 				(ARCH_F),
+					.N 				(ARCH_W)
+				) mult_k (
+			 		.i_multiplicand (p_next[i][k]),
+			 		.i_multiplier	(s_inv[k][j]),
+			 		.o_result		(k_mat_mult[i][j][k])
+				);
+			end
+		end
+	end
+endgenerate
 
-// TODO
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_k_add_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: gen_k_add_cols
+			qadd #(
+				.Q 				(ARCH_F),
+				.N 				(ARCH_W)
+			) add_k (
+				.a 				(k_mat_mult[i][j][0]),
+				.b 				(k_mat_mult[i][j][1]),
+				.c 				(k_mat_sum[i][j])
+			);		
+		end
+	end
+endgenerate
+
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_k_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: gen_k_cols
+			always @(posedge clk) begin
+				if (fsm_clear_tmp)		 			k_mat[i][j] <= 'd0;
+				else if (fsm_curr == FSM_INTERIM_3) k_mat[i][j] <= k_mat_sum[i][j];
+				else								k_mat[i][j] <= k_mat[i][j];
+			end
+		end
+	end
+endgenerate
 
 // Current X Value - Set to predicted value for initial testing
 generate

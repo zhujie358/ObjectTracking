@@ -59,7 +59,7 @@ initial begin
 	for (c = 0; c < 10; c = c + 1) begin: gen_loop
 		mb.put('d370);
 		mb.put('d350);
-		#150;
+		#550;
 	end
 
 	$stop;

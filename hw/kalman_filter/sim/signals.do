@@ -17,6 +17,7 @@ add wave -logic -radix hexadecimal myKalman/y_vec
 add wave -logic -radix hexadecimal myKalman/s_mat
 add wave -logic -radix hexadecimal myKalman/s_det
 add wave -logic -radix hexadecimal myKalman/s_inv
+add wave -logic -radix hexadecimal myKalman/k_mat
 add wave -logic -radix hexadecimal myKalman/z_x_new
 add wave -logic -radix hexadecimal myKalman/z_y_new
 
