@@ -2,6 +2,11 @@
 
 module testbench();
 
+// Simulation Params
+localparam LOOP_ITER = 10;
+localparam DELAY = 1000;
+
+// Display Size
 localparam DISP_WIDTH = 11;
 
 reg clk;
@@ -56,10 +61,10 @@ initial begin
 
 	rst_n   = 1;
  
-	for (c = 0; c < 10; c = c + 1) begin: gen_loop
+	for (c = 0; c < LOOP_ITER; c = c + 1) begin: gen_loop
 		mb.put('d370);
 		mb.put('d350);
-		#550;
+		#DELAY;
 	end
 
 	$stop;

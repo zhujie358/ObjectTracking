@@ -19,5 +19,7 @@ add wave -logic -radix hexadecimal myKalman/x_curr
 add wave -logic -radix hexadecimal myKalman/p_curr
 add wave -logic -radix hexadecimal myKalman/z_x_new
 add wave -logic -radix hexadecimal myKalman/z_y_new
+add wave -logic myKalman/s_det_prod_1_over
+add wave -logic myKalman/s_det_prod_2_over
 
 run -all

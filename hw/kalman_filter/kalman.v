@@ -49,7 +49,7 @@ localparam FSM_INTERIM_3 = 7;
 localparam FSM_UPDATE    = 8;
 
 // Architecture
-localparam ARCH_W 		= 32;
+localparam ARCH_W 		= 36;
 localparam ARCH_F 		= 15;
 
 // Kalman State Space
@@ -58,9 +58,9 @@ localparam NUM_MEASUR 	= 2;
 
 // Fixed Point Values - sign | integer | fraction
 localparam FLIP_SIGN    = {1'b1, {(ARCH_W-1){1'b0}}};
-localparam ONE_FI 		= ('b0 << (ARCH_W-1)) | ('b1 << (ARCH_W-ARCH_F-2)) | 'b0;
-localparam TSTEP_FI 	= ('b0 << (ARCH_W-1)) | ('b0 << (ARCH_W-ARCH_F-2)) | 'b000000111111100;
-localparam RDIAG_FI     = ('b0 << (ARCH_W-1)) | ('d1000 << (ARCH_W-ARCH_F-2)) | 'b0; 
+localparam ONE_FI 		= ('b0 << (ARCH_W-1)) | ('b1 << ARCH_F) | 'b0;
+localparam TSTEP_FI 	= ('b0 << (ARCH_W-1)) | ('b0 << ARCH_F) | 'b000000111111100;
+localparam RDIAG_FI     = ('b0 << (ARCH_W-1)) | ('d1000 << ARCH_F) | 'b0; 
 
 /////////////////////////////// INTERNAL SIGNALS & VARIABLES ///////////////////////////////////
 
@@ -128,7 +128,9 @@ reg	  [(ARCH_W-1):0]	y_vec		[0:NUM_MEASUR-1];
 wire  [(ARCH_W-1):0]	s_add 		[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 reg   [(ARCH_W-1):0]	s_mat 		[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 wire  [(ARCH_W-1):0] 	s_det_prod_1;
+wire 					s_det_prod_1_over;
 wire  [(ARCH_W-1):0] 	s_det_prod_2;
+wire 					s_det_prod_2_over;
 wire  [(ARCH_W-1):0] 	s_det;
 wire  [(ARCH_W-1):0]	s_inv_tmp 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 wire  [(ARCH_W-1):0]	s_inv_tmp2 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
@@ -233,8 +235,8 @@ always @(posedge clk or negedge aresetn) begin
 	// Latch values and scale to match x_next precision - put in fixed-point format
  	else if (ready & valid)	
  		begin
- 			z_vec[0] <= ('b0 << (ARCH_W-1)) | (z_x << (ARCH_W-ARCH_F-2)) | 'b0;
- 			z_vec[1] <= ('b0 << (ARCH_W-1)) | (z_y << (ARCH_W-ARCH_F-2)) | 'b0;
+ 			z_vec[0] <= ('b0 << (ARCH_W-1)) | (z_x << ARCH_F) | 'b0;
+ 			z_vec[1] <= ('b0 << (ARCH_W-1)) | (z_y << ARCH_F) | 'b0;
  		end
  	else 
  		begin
@@ -438,7 +440,7 @@ generate
 			) sub_y_vec (
 				.a 				(z_vec[i]),
 				// Flip the sign bit to get subtraction (unless its zero)
-				.b 				(~(&x_next[i]) ? x_next[i] : x_next[i] ^ FLIP_SIGN),
+				.b 				(~(|x_next[i]) ? x_next[i] : x_next[i] ^ FLIP_SIGN),
 				.c 				(y_sub[i])
 			);
 	end
@@ -489,7 +491,8 @@ qmult #(
 ) det_product_1 (
 		.i_multiplicand (s_mat[0][0]),
 		.i_multiplier	(s_mat[1][1]),
-		.o_result		(s_det_prod_1)
+		.o_result		(s_det_prod_1),
+		.ovr 			(s_det_prod_1_over)		
 );
 qmult #(
 	.Q 				(ARCH_F),
@@ -497,7 +500,8 @@ qmult #(
 ) det_product_2 (
 		.i_multiplicand (s_mat[0][1]),
 		.i_multiplier	(s_mat[1][0]),
-		.o_result		(s_det_prod_2)
+		.o_result		(s_det_prod_2),
+		.ovr 			(s_det_prod_2_over)
 );
 qadd #(
 	.Q 				(ARCH_F),
@@ -505,14 +509,14 @@ qadd #(
 ) det_sub (
 	.a 				(s_det_prod_1),
 	// Flip the sign bit to get subtraction (unless its zero)
-	.b 				(~(&s_det_prod_2) ? s_det_prod_2 : s_det_prod_2 ^ FLIP_SIGN),
+	.b 				(~(|s_det_prod_2) ? s_det_prod_2 : s_det_prod_2 ^ FLIP_SIGN),
 	.c  			(s_det)
 );
 
 assign s_inv_tmp[0][0] = s_mat[1][1];
 assign s_inv_tmp[1][1] = s_mat[0][0];
-assign s_inv_tmp[0][1] = ~(&s_mat[0][1]) ? s_mat[0][1] : s_mat[0][1] ^ FLIP_SIGN;
-assign s_inv_tmp[1][0] = ~(&s_mat[1][0]) ? s_mat[1][0] : s_mat[1][0] ^ FLIP_SIGN;
+assign s_inv_tmp[0][1] = ~(|s_mat[0][1]) ? s_mat[0][1] : s_mat[0][1] ^ FLIP_SIGN;
+assign s_inv_tmp[1][0] = ~(|s_mat[1][0]) ? s_mat[1][0] : s_mat[1][0] ^ FLIP_SIGN;
 
 generate
 	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: s_inv_tmp_rows
@@ -655,8 +659,8 @@ generate
 			) diff_p_curr (
 				// Since p_init is the 4x4 identity we can use it here instead of making a new identity
 				.a 				(p_init[i][j]),
-				// Flip sign to get difference (unless its zero, then don't flip the sign)
-				.b 				(~(&k_special[i][j]) ? k_special[i][j] : k_special[i][j] ^ FLIP_SIGN),
+				// Flip sign to get subtraction (unless its zero)
+				.b 				(~(|k_special[i][j]) ? k_special[i][j] : k_special[i][j] ^ FLIP_SIGN),
 				.c 				(p_curr_diff[i][j])
 			);
 		end
