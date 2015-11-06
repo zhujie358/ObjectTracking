@@ -461,4 +461,7 @@ set_global_assignment -name VERILOG_FILE ../common/delta_divide.v
 set_global_assignment -name VERILOG_FILE ../common/rgb_to_grayscale.v
 set_global_assignment -name VERILOG_FILE ../common/measure_position.v
 set_global_assignment -name VERILOG_FILE ../common/color_position.v
+set_global_assignment -name VERILOG_FILE ../common/fixed_point/qadd.v
+set_global_assignment -name VERILOG_FILE ../common/fixed_point/qmult.v
+set_global_assignment -name VERILOG_FILE ../common/fixed_point/qdiv.v
 set_global_assignment -name VERILOG_FILE ./kalman.v

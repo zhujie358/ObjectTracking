@@ -67,16 +67,16 @@ always @(posedge clk or negedge aresetn) begin
 			int_g_out <= 'd0;
 			int_b_out <= 'd0;			
 		end
-	else if (enable & vga_is_object)
-		begin
-			int_r_out <= {COLOR_WIDTH {1'b1}};
-			int_g_out <= {COLOR_WIDTH {1'b0}};
-			int_b_out <= {COLOR_WIDTH {1'b0}};
-		end
 	else if (enable & vga_is_kalman)
 		begin
 			int_r_out <= {COLOR_WIDTH {1'b0}};
 			int_g_out <= {COLOR_WIDTH {1'b1}};
+			int_b_out <= {COLOR_WIDTH {1'b0}};
+		end
+	else if (enable & vga_is_object)
+		begin
+			int_r_out <= {COLOR_WIDTH {1'b1}};
+			int_g_out <= {COLOR_WIDTH {1'b0}};
 			int_b_out <= {COLOR_WIDTH {1'b0}};
 		end
 

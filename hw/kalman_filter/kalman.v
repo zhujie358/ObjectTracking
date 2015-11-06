@@ -69,7 +69,8 @@ reg  [(FSM_WIDTH-1):0]	fsm_curr;
 reg  [(FSM_WIDTH-1):0]	fsm_next;
 wire 					fsm_clear_all;
 wire 					fsm_clear_tmp;
-wire 					division_done;
+wire					division_done;
+wire 					division 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 
 // Output Wrappers
 wire [(ARCH_W-1):0] 	z_x_new_int; 
@@ -173,13 +174,14 @@ end
 assign ready 		 = (fsm_curr == FSM_IDLE);
 assign fsm_clear_all = (fsm_curr == FSM_INIT);
 assign fsm_clear_tmp = (fsm_curr == FSM_INIT) | (fsm_curr == FSM_IDLE);
+assign division_done = division[0][0] & division[0][1] & division[1][0] & division[1][1];
 
 ///////////////////////////////// STATIC MATRICES AND VECTORS //////////////////////////////////
 
 // Set x_init to zeros, and p_init and q_mat to identity. Set f_mat to identity with t_step.
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_vec_init
-		assign x_init[i] = ONE_FI;
+		assign x_init[i] = 'd0;
 		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_mat_init
 			if (i == j) 
 				begin
@@ -233,7 +235,7 @@ always @(posedge clk or negedge aresetn) begin
 			z_vec[1] <= 'd0;
 		end
 	// Latch values and scale to match x_next precision - put in fixed-point format
- 	else if (ready & valid)	
+ 	else if (ready & valid)
  		begin
  			z_vec[0] <= ('b0 << (ARCH_W-1)) | (z_x << ARCH_F) | 'b0;
  			z_vec[1] <= ('b0 << (ARCH_W-1)) | (z_y << ARCH_F) | 'b0;
@@ -534,7 +536,7 @@ generate
 			.i_divisor  	(s_det),
 
 			// Output Control
-			.o_complete		(division_done),
+			.o_complete		(division[i][j]),
 
 			// Output Data
 			.o_quotient_out (s_inv_tmp2[i][j])
