@@ -17,4 +17,4 @@ The goal of this experiment is to implement the `sw/applyKalman.m` software in h
 
 Below is a diagram of the video pipleine for the final hardware implementation.
 
-![image](../../doc/images/final_pipeline.svg)
+![image](../../doc/images/final_pipeline.jpg)
