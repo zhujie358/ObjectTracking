@@ -13,6 +13,7 @@ module color_position # (
 	input wire clk, 
 	input wire aresetn,
 	input wire enable,
+	input wire enable_kalman,
 
 	// Regular Video Data
 	input wire [(COLOR_WIDTH-1):0] curr,
@@ -67,7 +68,7 @@ always @(posedge clk or negedge aresetn) begin
 			int_g_out <= 'd0;
 			int_b_out <= 'd0;			
 		end
-	else if (enable & vga_is_kalman)
+	else if (enable & vga_is_kalman & enable_kalman)
 		begin
 			int_r_out <= {COLOR_WIDTH {1'b0}};
 			int_g_out <= {COLOR_WIDTH {1'b1}};

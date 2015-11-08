@@ -112,6 +112,7 @@ localparam LINES_EVEN_END   	= LINES_EVEN_START + VGA_RES_V_ACT_2;
 wire 						aresetn;
 
 // User Control
+wire 						enable_kal;
 wire 						grab_base;
 wire 						track_object;
 wire						disp_delta;
@@ -163,6 +164,7 @@ wire						vga_ready;			// VGA data request
 // Map user control to peripherals
 assign aresetn 		=  KEY[0];
 assign grab_base 	= ~KEY[1];
+assign enable_kal   =  SW[14];
 assign filter_delta =  SW[15];
 assign track_object =  SW[16];
 assign disp_delta   =  SW[17];
@@ -336,7 +338,7 @@ kalman #(
 	// Input Data
 	.z_x 			(x_object),
 	.z_y			(y_object),
-	.valid 			(xy_valid),
+	.valid 			(xy_valid & enable_kal),
 
 	// Output Data
 	.z_x_new 		(x_kalman),
@@ -352,6 +354,7 @@ color_position #(
 	.clk 			(TD_CLK27),
 	.aresetn 		(aresetn),
 	.enable 		(track_object),
+	.enable_kalman  (enable_kal),
 
 	// Input Data: From VGA
 	.x_pos 			(vga_x),
