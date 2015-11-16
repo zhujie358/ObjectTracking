@@ -54,7 +54,7 @@ Warren \textsc{Gross, Prof.}\\
 Arash \textsc{Ardakani} 
 \end{flushleft}
 \begin{flushleft} \large
-\emph{\Large Sponsored By:}\\
+\emph{\Large Sponsored by:}\\
 \vspace{.2cm}
 \textsc{Analog Devices}\\
 \end{flushleft}
@@ -63,9 +63,9 @@ Arash \textsc{Ardakani}
 \end{titlepage}
 \pagebreak
 \section*{Abstract}
-Hello World
+
 \section*{Acknowledgments}
-Hello World
+We would like to thank Professor Warren Gross and Arash Ardakani for overseeing this project and providing advice, insight, and direction over the course of the year. We would also like to thank Analog Devices for providing us with the Altera DE2 board needed for hardware implementation, and in particular Leah Magaldi for being our main point of contact. Finally, the example TV decoder Verilog code provided by Terasic was a major asset for hardware implementation, we would like to thank them for making it open and available to developers like ourselves. 
 \pagebreak
 \tableofcontents
 \pagebreak
@@ -84,6 +84,32 @@ The algorithm implemented in software, and presented in \cite{15}, for determini
 Describe a video pipeline and common components.
 \subsection{The VGA Interface}
 Discuss the timing signals 
+\section{Requirements}
+\section{Design}
+\subsection{Generating VGA Output}
+Make sure mention the design references for this.
+\subsection{Simple Video Pipeline}
+This is where you should cite \cite{13} and talk about the video input wrapper module.
+\subsection{Storing the Base Frame}
+This is where you should cite \cite{14} and talk about the SRAM.
+\subsection{RGB to Grayscale Conversion}
+Simple discussion here.
+\subsection{Modified Video Pipeline}
+Talk about moving the RGB conversion further upstream prior to the SDRAM such that we can work in RGB.
+\subsubsection{Delta Frame Generation}
+Discuss the poor man's absolute value implemented and the saturation filter.
+\subsubsection{Moving Average Filter}
+Show the two pictures of the before/after moving average filter here.
+\subsection{Measuring Object Position}
+Make sure to mention it's using the VGA module counters.
+\subsection{Kalman Filter}
+Lots of meat here.
+\section{Future Work}
+The system could be significantly improved by using a measurement algorithm that has fewer requirements and assumptions regarding the environment. Variations in lighting and changes in the background cause the delta frame generation to break, and in a real-time situation we found it difficult to ensure that all the requirements were met.
+\section{Impact on Society}
+\section{Allocation of Work}
+\section{Conclusion}
+The final hardware implementation was a success, and the system can display a red dot that shows the $(x,y)$ measurement of the object in the frame as well as green dot showing the improved $(x',y')$ position the Kalman filter produces. Due to the underlying principles of the delta frame generation, the system is an object tracking algorithm and not a motion tracking algorithm. However, the Kalman filter theoretical model assumes constant velocity.This is why when the object stops moving, the green dot slowly converges to the red one. This shows the system favoring the measurements over the model to reduce error, and demonstrates the Kalman filter functioning properly. When the object is moving with constant velocity, the Kalman filter provides a smoother, improved output.
 \newpage
 \begin{thebibliography}{11}
 \bibitem{1}
@@ -113,7 +139,7 @@ N. Devillard. (1998, July). \textit{Fast median search: an ANSI C implementation
 D. Kohanbash. (2014, January 30). \textit{Kalman Filtering - A Practical Implementation Guide (with code!)} [Online]. Available: http://robotsforroboticists.com/kalman-filtering/
 \bibitem{13} Recommendation ITU-R BT.656-5 (12/2007). “Interface for digital component video signals in 525-line and 625-line television systems operating at the 4:2:2 level of Recommendation ITU-R BT.601". 
 \bibitem{14} ISSI Datasheet: “1M x 16 High-Speed Asynchronous CMOS Static RAM with 3.3V Supply".
-\bibitem{15} B. Brown \& T. Dotsikas. 
+\bibitem{15} B. Brown \& T. Dotsikas, “A Real-Time Object Tracking System”, ECSE 456 Final Report, unpublished.
 \end{thebibliography}
 \newpage
 \appendix
