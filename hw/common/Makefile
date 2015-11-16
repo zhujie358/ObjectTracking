@@ -2,6 +2,7 @@ EXP_NAME = kalman_filter
 
 make all:
 	@echo "------------ TARGETS ------------"
+	@echo "doc        : Generate Latex documentation of Phase 2 report."
 	@echo "simulate   : Functional simulation of Verilog test bench."
 	@echo "hw_all     : Entire hardware flow."
 	@echo "hw_compile : Compile the RTL code to check for bugs."
@@ -56,3 +57,8 @@ simulate:
 	vlog  ./sim/testbench.sv ./kalman.v ../common/fixed_point/qadd.v ../common/fixed_point/qmult.v ../common/fixed_point/qdiv.v
 	modelsim -do sim/signals.do
 	touch simulate
+
+doc:
+	pdflatex report_phase2.tex
+	rm -f *.log *.aux *.out
+	cygstart report_phase2.pdf

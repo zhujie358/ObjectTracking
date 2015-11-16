@@ -56,5 +56,6 @@ incremental_db/
 
 # Ignore any symbolic Makefiles or other instances
 hw/*/Makefile
+doc/Makefile
 
 *~
