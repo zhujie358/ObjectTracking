@@ -15,7 +15,7 @@ clean:
 	rm -rf db/
 	rm -rf incremental_db/
 	rm -rf work/
-	rm -f *.rpt *.smsg *.rpt *.pin *.sof *.summary *.done *.txt *.bak *.qpf *.wlf
+	rm -f *.rpt *.smsg *.rpt *.pin *.sof *.summary *.done *.txt *.bak *.qpf *.wlf *.log *.aux *.out *.toc
 	rm -f transcript
 	rm -f hw_compile 
 	rm -f hw_pnr
@@ -60,5 +60,4 @@ simulate:
 
 doc:
 	pdflatex report_phase2.tex
-	rm -f *.log *.aux *.out
 	cygstart report_phase2.pdf

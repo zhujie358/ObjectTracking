@@ -63,7 +63,7 @@ Arash \textsc{Ardakani}
 \end{titlepage}
 \pagebreak
 \section*{Abstract}
-
+This project aimed to research object tracking algorithms, and implement the algorithm best suited to meet project requirements in both software and hardware. The software implementation used static input videos and the hardware implementation used a real-time input video stream. Phase 1 of the project focused on algorithm research and software implementation, and is documented in \cite{15}. Phase 2 of the project focused on hardware implementation, and this report encompasses all of Phase 2 from the design process to the final results. It was found that hardware implementation of the algorithm provides a much faster way of tracking an object when compared to the equivalent software implementation. It was also found that using a background subtraction, delta frame based algorithm to determine object position is not the best choice for real-time situations, due to the inability to cope with lighting and background variations. It was also found that while a Kalman filter does greatly improve object tracking results, it comes at a heavy cost in terms of hardware utilization.
 \section*{Acknowledgments}
 We would like to thank Professor Warren Gross and Arash Ardakani for overseeing this project and providing advice, insight, and direction over the course of the year. We would also like to thank Analog Devices for providing us with the Altera DE2 board needed for hardware implementation, and in particular Leah Magaldi for being our main point of contact. Finally, the example TV decoder Verilog code provided by Terasic was a major asset for hardware implementation, we would like to thank them for making it open and available to developers like ourselves. 
 \pagebreak
@@ -75,13 +75,38 @@ We would like to thank Professor Warren Gross and Arash Ardakani for overseeing 
 \item[] VGA - Video Graphics Array
 \end{itemize}
 \section{Introduction}
-Hello World
+The ability to determine the position of an object in a scene is a highly relevant challenge for industries like surveillance and robotics. This task represents a challenge from an engineering perspective due to the real-time timing constraints placed on these systems, and the large amount of data that must be processed when working with video data. In order to overcome these challenges, custom hardware implementation has become an increasingly popular solution as demonstrated in \cite{1}, \cite{2}, and \cite{3}.
 \section{Background}
 This section contains the prerequisite information regarding video tracking needed to understand the system architecture and design. For background information regarding the basics of video processing, Kalman filtering, fixed-point representation, and optical flow, please see \cite{15}.
+\subsection{Moving Average Filter}
+A moving average filter replaces the current input data sample with a mean of some number of past input data samples. The number is referred to as the moving average filter length, $N$. This type of filter is particularly useful when data samples are arriving in a time series (i.e. at constant time intervals) as it will remove outliers, creating a smoother trend in data samples. Given that $p_i$ is the current input data sample, the filtered results, $p_i'$, is given using the following equation,
+\begin{equation}
+p_i' = \frac{\sum_{k = i}^{i + N} p_{k-N}}{N}
+\end{equation}
+\subsection{Saturation Filter}
+A saturation filter, in the context of this project, refers to either flooring a grayscale pixel intensity to a minimum value or ceiling the grayscale pixel intensity to a maximum value, if it is below or above a threshold. The pseudo-code for the saturation filter is given below.
+\begin{lstlisting}
+function [output] = saturation_filter(input, min, max, thresh)
+	if (input > thresh)
+		output = max;
+	else
+		output = min;
+	end
+end
+\end{lstlisting} 
+This makes the data set binary, in the sense that all values are one of two values, and makes data processing significantly easier. In the context of object tracking, values above the threshold indicate an object present in the scene, and values below indicate no object present.
 \subsection{Determining Position}
-The algorithm implemented in software, and presented in \cite{15}, for determining the $(x,y)$ position of an object in the delta frame used a rastor scan technique to determine the leftmost, rightmost, top, and bottom pixels. By intersecting two lines formed between these points, the center of the object can be estimated. It was found that despite the success of this algorithm in software, it would not be conducive to hardware implementation.
+The algorithm implemented in software, and presented in \cite{15}, for determining the $(x,y)$ position of an object in the delta frame used a rastor scan technique to determine the leftmost, rightmost, top, and bottom pixels. By intersecting two lines formed between these points, the center of the object can be estimated. It was found that despite the success of this algorithm in software, it would not be conducive to hardware implementation. This is mainly due to the fact that in the software implementation, data arrived in discrete frames from MATLAB's \texttt{VideoReader} class at constant time steps. In hardware implementation, data is handled at the pixel level, with a constant stream of pixels being placed in and extracted from a FIFO frame buffer storage module (to be discussed later). Thus using an algorithm that requires an entire frame requires more memory and extra logic. A new algorithm was developed to determine the local of the object. \\\\
+This algorithm assumes that pixel data arrives in binary format; either a string of all zeros representing no object present or a string of all ones representing an object present. Note that this data format is achieved by using the saturation filter just discussed. The algorithm tests if the pixel is an object pixel or not, and if it is the $x$ and $y$ coordinates of the pixel are each added to a rolling summation ($x_{sum}$ and $y_{sum}$). A counter, $n$, is also incremented At the end of the frame, the rolling summations are divided by the counter, the position is outputted, and the three values are cleared. This algorithm is essentially just taking an average of the $(x,y)$ coordinates of the object pixels as the center of the object.
+\begin{equation}
+x = \frac{x_{sum}}{n}
+\end{equation} 
+\begin{equation}
+y = \frac{y_{sum}}{n}
+\end{equation} 
+Note that this algorithm achieves best results when the object is highly symmetric.
 \subsection{Video Pipeline}
-Describe a video pipeline and common components.
+The phrase \textit{video pipeline} refers to a series of image processing modules that exist between the video input device (e.g. the camera) and the video output device (e.g. the display). The pipeline can be implemented in software or hardware, but for the scope of this report the pipeline will refer to hardware implementation, and modules will be referred to in the Verilog sense. Modules in the video pipeline generally consist of decoding and encoding the video data into various formats, and performing video processing (e.g. applying algorithms of interest) in the middle. Implementing a video pipeline is directly coupled with implementing an object tracking algorithm in hardware, as there are no libraries or classes to convert and store the incoming video data when working at this low of a level.
 \subsection{The VGA Interface}
 Discuss the timing signals 
 \section{Requirements}
@@ -107,6 +132,7 @@ Lots of meat here.
 \section{Future Work}
 The system could be significantly improved by using a measurement algorithm that has fewer requirements and assumptions regarding the environment. Variations in lighting and changes in the background cause the delta frame generation to break, and in a real-time situation we found it difficult to ensure that all the requirements were met.
 \section{Impact on Society}
+This topic was discussed in the Phase 1 report, and there were no changes in the project scope during Phase 2 that would change the impact of society. Please see \cite{15} for the discussion.
 \section{Allocation of Work}
 \section{Conclusion}
 The final hardware implementation was a success, and the system can display a red dot that shows the $(x,y)$ measurement of the object in the frame as well as green dot showing the improved $(x',y')$ position the Kalman filter produces. Due to the underlying principles of the delta frame generation, the system is an object tracking algorithm and not a motion tracking algorithm. However, the Kalman filter theoretical model assumes constant velocity.This is why when the object stops moving, the green dot slowly converges to the red one. This shows the system favoring the measurements over the model to reduce error, and demonstrates the Kalman filter functioning properly. When the object is moving with constant velocity, the Kalman filter provides a smoother, improved output.
