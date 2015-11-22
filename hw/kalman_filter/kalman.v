@@ -49,8 +49,8 @@ localparam FSM_INTERIM_3 = 7;
 localparam FSM_UPDATE    = 8;
 
 // Architecture
-localparam ARCH_W 		= 38;
-localparam ARCH_F 		= 15;
+localparam ARCH_W 		= 33;
+localparam ARCH_F 		= 11;
 
 // Kalman State Space
 localparam NUM_STATES 	= 4;
