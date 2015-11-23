@@ -49,8 +49,11 @@ localparam FSM_INTERIM_3 = 7;
 localparam FSM_UPDATE    = 8;
 
 // Architecture
-localparam ARCH_W 		= 33;
-localparam ARCH_F 		= 11;
+localparam ARCH_W 		= 18;
+localparam ARCH_F 		= 6;
+
+localparam ARCH_W_B     = 33;
+localparam ARCH_F_B     = 11;
 
 // Kalman State Space
 localparam NUM_STATES 	= 4;
@@ -128,19 +131,22 @@ reg	  [(ARCH_W-1):0]	y_vec		[0:NUM_MEASUR-1];
 // Residual Covariance
 wire  [(ARCH_W-1):0]	s_add 		[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 reg   [(ARCH_W-1):0]	s_mat 		[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-wire  [(ARCH_W-1):0] 	s_det_prod_1;
+wire  [(ARCH_W_B-1):0]	s_mat_fix	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W_B-1):0] 	s_det_prod_1;
 wire 					s_det_prod_1_over;
-wire  [(ARCH_W-1):0] 	s_det_prod_2;
+wire  [(ARCH_W_B-1):0] 	s_det_prod_2;
 wire 					s_det_prod_2_over;
-wire  [(ARCH_W-1):0] 	s_det;
-wire  [(ARCH_W-1):0]	s_inv_tmp 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-wire  [(ARCH_W-1):0]	s_inv_tmp2 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-reg   [(ARCH_W-1):0]	s_inv 	 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W_B-1):0] 	s_det;
+wire  [(ARCH_W_B-1):0]	s_inv_tmp 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W_B-1):0]	s_inv_tmp2 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+reg   [(ARCH_W_B-1):0]	s_inv 	 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 
 // Optimal Kalman Gain 
-wire  [(ARCH_W-1):0]	k_mat_mult	[0:NUM_STATES-1][0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-wire  [(ARCH_W-1):0]	k_mat_sum	[0:NUM_STATES-1][0:NUM_MEASUR-1];
-reg   [(ARCH_W-1):0]	k_mat		[0:NUM_STATES-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W_B-1):0]	p_next_fix 	[0:NUM_STATES-1][0:NUM_STATES-1];
+wire  [(ARCH_W_B-1):0]	k_mat_mult	[0:NUM_STATES-1][0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W_B-1):0]	k_mat_sum	[0:NUM_STATES-1][0:NUM_MEASUR-1];
+reg   [(ARCH_W_B-1):0]	k_mat_fix	[0:NUM_STATES-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W-1):0]	k_mat		[0:NUM_STATES-1][0:NUM_MEASUR-1];
 wire  [(ARCH_W-1):0]	k_special   [0:NUM_STATES-1][0:NUM_STATES-1];
 
 // Loops that get rolled out on compile time
@@ -486,28 +492,37 @@ generate
 	end
 endgenerate
 
+// Change fixed-point representation of S matrix in preparation for inversion
+generate 
+	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: fix_s_mat_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: fix_s_mat_cols
+			assign s_mat_fix[i][j] = {s_mat[i][j][ARCH_W-1], {((ARCH_W_B - ARCH_F_B - 1)-(ARCH_W - ARCH_F - 1)){1'b0}}, s_mat[i][j][(ARCH_W-2):0], {(ARCH_F_B - ARCH_F){1'b0}}};
+		end
+	end
+endgenerate
+
 // Invert S - 2x2 matrix so swap positions, flip signs, and divide by determinant
 qmult #(
-	.Q 				(ARCH_F),
-	.N 				(ARCH_W)
+	.Q 				(ARCH_F_B),
+	.N 				(ARCH_W_B)
 ) det_product_1 (
-		.i_multiplicand (s_mat[0][0]),
-		.i_multiplier	(s_mat[1][1]),
+		.i_multiplicand (s_mat_fix[0][0]),
+		.i_multiplier	(s_mat_fix[1][1]),
 		.o_result		(s_det_prod_1),
 		.ovr 			(s_det_prod_1_over)		
 );
 qmult #(
-	.Q 				(ARCH_F),
-	.N 				(ARCH_W)
+	.Q 				(ARCH_F_B),
+	.N 				(ARCH_W_B)
 ) det_product_2 (
-		.i_multiplicand (s_mat[0][1]),
-		.i_multiplier	(s_mat[1][0]),
+		.i_multiplicand (s_mat_fix[0][1]),
+		.i_multiplier	(s_mat_fix[1][0]),
 		.o_result		(s_det_prod_2),
 		.ovr 			(s_det_prod_2_over)
 );
 qadd #(
-	.Q 				(ARCH_F),
-	.N 				(ARCH_W)
+	.Q 				(ARCH_F_B),
+	.N 				(ARCH_W_B)
 ) det_sub (
 	.a 				(s_det_prod_1),
 	// Flip the sign bit to get subtraction (unless its zero)
@@ -515,17 +530,17 @@ qadd #(
 	.c  			(s_det)
 );
 
-assign s_inv_tmp[0][0] = s_mat[1][1];
-assign s_inv_tmp[1][1] = s_mat[0][0];
-assign s_inv_tmp[0][1] = ~(|s_mat[0][1]) ? s_mat[0][1] : s_mat[0][1] ^ FLIP_SIGN;
-assign s_inv_tmp[1][0] = ~(|s_mat[1][0]) ? s_mat[1][0] : s_mat[1][0] ^ FLIP_SIGN;
+assign s_inv_tmp[0][0] = s_mat_fix[1][1];
+assign s_inv_tmp[1][1] = s_mat_fix[0][0];
+assign s_inv_tmp[0][1] = ~(|s_mat_fix[0][1]) ? s_mat_fix[0][1] : s_mat_fix[0][1] ^ FLIP_SIGN;
+assign s_inv_tmp[1][0] = ~(|s_mat_fix[1][0]) ? s_mat_fix[1][0] : s_mat_fix[1][0] ^ FLIP_SIGN;
 
 generate
 	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: s_inv_tmp_rows
 		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: s_inv_tmp_cols
 		qdiv#(
-			.Q 			(ARCH_F),
-			.N 			(ARCH_W)
+			.Q 			(ARCH_F_B),
+			.N 			(ARCH_W_B)
 		) s_inv_div (
 			// Input Control
 			.i_clk      	(clk),
@@ -558,16 +573,25 @@ generate
 	end
 endgenerate
 
+// Change fixed-point representation of p_next to match s_inv for k_mat computation
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: fix_p_next_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: fix_p_next_cols
+			assign p_next_fix[i][j] = {p_next[i][j][ARCH_W-1], {((ARCH_W_B - ARCH_F_B - 1)-(ARCH_W - ARCH_F - 1)){1'b0}}, p_next[i][j][(ARCH_W-2):0], {(ARCH_F_B - ARCH_F){1'b0}}};
+		end
+	end
+endgenerate
+
 // K Matrix - 4x2 matrix (left half of p_next) times a 2x2 matrix (s inverse)
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_k_mult_rows
 		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: gen_k_mult_cols
 			for (k = 0; k < NUM_MEASUR; k = k + 1) begin: gen_k_mult
 				qmult #(
-					.Q 				(ARCH_F),
-					.N 				(ARCH_W)
+					.Q 				(ARCH_F_B),
+					.N 				(ARCH_W_B)
 				) mult_k (
-			 		.i_multiplicand (p_next[i][k]),
+			 		.i_multiplicand (p_next_fix[i][k]),
 			 		.i_multiplier	(s_inv[k][j]),
 			 		.o_result		(k_mat_mult[i][j][k])
 				);
@@ -580,8 +604,8 @@ generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_k_add_rows
 		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: gen_k_add_cols
 			qadd #(
-				.Q 				(ARCH_F),
-				.N 				(ARCH_W)
+				.Q 				(ARCH_F_B),
+				.N 				(ARCH_W_B)
 			) add_k (
 				.a 				(k_mat_mult[i][j][0]),
 				.b 				(k_mat_mult[i][j][1]),
@@ -595,10 +619,19 @@ generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_k_rows
 		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: gen_k_cols
 			always @(posedge clk) begin
-				if (fsm_clear_tmp)		 			k_mat[i][j] <= 'd0;
-				else if (fsm_curr == FSM_INTERIM_3) k_mat[i][j] <= k_mat_sum[i][j];
-				else								k_mat[i][j] <= k_mat[i][j];
+				if (fsm_clear_tmp)		 			k_mat_fix[i][j] <= 'd0;
+				else if (fsm_curr == FSM_INTERIM_3) k_mat_fix[i][j] <= k_mat_sum[i][j];
+				else								k_mat_fix[i][j] <= k_mat_fix[i][j];
 			end
+		end
+	end
+endgenerate
+
+// Change fixed-point representation of k_mat to original representation and hope life is good
+generate
+	for (i = 0; i < NUM_STATES; i = i + 1) begin: unfix_k_mat_rows
+		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: unfix_k_mat_cols
+			assign k_mat[i][j] = {k_mat_fix[i][j][ARCH_W_B-1], k_mat_fix[i][j][21:5]};
 		end
 	end
 endgenerate
