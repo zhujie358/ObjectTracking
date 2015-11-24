@@ -16,7 +16,8 @@
 	when it is multiplied by another matrix. To make life, hardware, and coding easier - the 
 	plucking is hard coded, and not done with multiplication.
 
-	A simple description of the FSM is as follows: 
+	The FSM is very simple, and walks through the equations. The only state with more than 
+	one cycle overhead is the FSM_DIVIDE state, which takes ARCH_W + ARCH_F + 1 cycles.
 */
 
 module kalman #(
@@ -49,18 +50,18 @@ localparam FSM_INTERIM_3 = 7;
 localparam FSM_UPDATE    = 8;
 
 // Architecture
-localparam ARCH_W 		= 33;
-localparam ARCH_F 		= 11;
+localparam ARCH_W 		 = 24;
+localparam ARCH_F 		 = 12;
 
 // Kalman State Space
-localparam NUM_STATES 	= 4;
-localparam NUM_MEASUR 	= 2;
+localparam NUM_STATES 	 = 4;
+localparam NUM_MEASUR 	 = 2;
 
 // Fixed Point Values - sign | integer | fraction
-localparam FLIP_SIGN    = {1'b1, {(ARCH_W-1){1'b0}}};
-localparam ONE_FI 		= ('b0 << (ARCH_W-1)) | ('b1 << ARCH_F) | 'b0;
-localparam TSTEP_FI 	= ('b0 << (ARCH_W-1)) | ('b0 << ARCH_F) | 'b000000111111100;
-localparam RDIAG_FI     = ('b0 << (ARCH_W-1)) | ('d1000 << ARCH_F) | 'b0; 
+localparam FLIP_SIGN     = {1'b1, {(ARCH_W-1){1'b0}}};
+localparam ONE_FI 		 = ('b0 << (ARCH_W-1)) | ('b1 << ARCH_F) | 'b0;
+localparam TSTEP_FI 	 = ('b0 << (ARCH_W-1)) | ('b0 << ARCH_F) | 'b000000111111100;
+localparam RDIAG_FI      = ('b0 << (ARCH_W-1)) | ('d1000 << ARCH_F) | 'b0; 
 
 /////////////////////////////// INTERNAL SIGNALS & VARIABLES ///////////////////////////////////
 
@@ -70,9 +71,18 @@ reg  [(FSM_WIDTH-1):0]	fsm_next;
 wire 					fsm_clear_all;
 wire 					fsm_clear_tmp;
 wire					division_done;
-wire 					division 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire 					division_overflow;
 
-// Output Wrappers
+// Debug
+wire 					x_curr_over	[0:NUM_STATES-1][0:NUM_MEASUR-1];
+wire 					x_next_over [0:NUM_STATES-1][0:NUM_STATES-1];
+wire 					p_temp_over [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1];
+wire 					p_curr_over [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1];
+wire 					p_next_over [0:NUM_STATES-1][0:NUM_STATES-1][0:NUM_STATES-1];
+wire 					k_mat_over	[0:NUM_STATES-1][0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+
+// Wrappers
+wire [(ARCH_W-1):0] 	one_fix;
 wire [(ARCH_W-1):0] 	z_x_new_int; 
 wire [(ARCH_W-1):0] 	z_y_new_int; 
 
@@ -128,13 +138,7 @@ reg	  [(ARCH_W-1):0]	y_vec		[0:NUM_MEASUR-1];
 // Residual Covariance
 wire  [(ARCH_W-1):0]	s_add 		[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 reg   [(ARCH_W-1):0]	s_mat 		[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-wire  [(ARCH_W-1):0] 	s_det_prod_1;
-wire 					s_det_prod_1_over;
-wire  [(ARCH_W-1):0] 	s_det_prod_2;
-wire 					s_det_prod_2_over;
-wire  [(ARCH_W-1):0] 	s_det;
-wire  [(ARCH_W-1):0]	s_inv_tmp 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
-wire  [(ARCH_W-1):0]	s_inv_tmp2 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
+wire  [(ARCH_W-1):0]	s_div;
 reg   [(ARCH_W-1):0]	s_inv 	 	[0:NUM_MEASUR-1][0:NUM_MEASUR-1];
 
 // Optimal Kalman Gain 
@@ -174,7 +178,7 @@ end
 assign ready 		 = (fsm_curr == FSM_IDLE);
 assign fsm_clear_all = (fsm_curr == FSM_INIT);
 assign fsm_clear_tmp = (fsm_curr == FSM_INIT) | (fsm_curr == FSM_IDLE);
-assign division_done = division[0][0] & division[0][1] & division[1][0] & division[1][1];
+assign one_fix 		 = ONE_FI;
 
 ///////////////////////////////// STATIC MATRICES AND VECTORS //////////////////////////////////
 
@@ -257,7 +261,8 @@ generate
 			) mult_x_next (
 		 		.i_multiplicand (f_mat[i][j]),
 		 		.i_multiplier	(x_curr[j]),
-		 		.o_result		(x_next_mult[i][j])
+		 		.o_result		(x_next_mult[i][j]),
+		 		.ovr 			(x_next_over[i][j])
 			);
 		end
 	end
@@ -313,7 +318,8 @@ generate
 				) mult_p_temp (
 			 		.i_multiplicand (f_mat[i][k]),
 			 		.i_multiplier	(p_curr[k][j]),
-			 		.o_result		(p_temp_mult[i][j][k])
+			 		.o_result		(p_temp_mult[i][j][k]),
+			 		.ovr 			(p_temp_over[i][j][k])
 				);
 			end
 		end
@@ -375,7 +381,8 @@ generate
 			 		.i_multiplicand (p_next_tmp[i][k]),
 			 		// Notice the indices are flipped from the last mult b/c we want f_mat transpose here
 			 		.i_multiplier	(f_mat[j][k]),
-			 		.o_result		(p_next_mult[i][j][k])
+			 		.o_result		(p_next_mult[i][j][k]),
+			 		.ovr 			(p_next_over[i][j][k])
 				);
 			end
 		end
@@ -486,77 +493,42 @@ generate
 	end
 endgenerate
 
-// Invert S - 2x2 matrix so swap positions, flip signs, and divide by determinant
-qmult #(
-	.Q 				(ARCH_F),
-	.N 				(ARCH_W)
-) det_product_1 (
-		.i_multiplicand (s_mat[0][0]),
-		.i_multiplier	(s_mat[1][1]),
-		.o_result		(s_det_prod_1),
-		.ovr 			(s_det_prod_1_over)		
-);
-qmult #(
-	.Q 				(ARCH_F),
-	.N 				(ARCH_W)
-) det_product_2 (
-		.i_multiplicand (s_mat[0][1]),
-		.i_multiplier	(s_mat[1][0]),
-		.o_result		(s_det_prod_2),
-		.ovr 			(s_det_prod_2_over)
-);
-qadd #(
-	.Q 				(ARCH_F),
-	.N 				(ARCH_W)
-) det_sub (
-	.a 				(s_det_prod_1),
-	// Flip the sign bit to get subtraction (unless its zero)
-	.b 				(~(|s_det_prod_2) ? s_det_prod_2 : s_det_prod_2 ^ FLIP_SIGN),
-	.c  			(s_det)
-);
+// Invert S - 2x2 matrix and assume (0,0) and (1,1) entries are equal and (0,1) and (1,0) are zero
+qdiv#(
+	.Q 			(ARCH_F),
+	.N 			(ARCH_W)
+) s_inv_div (
+	// Input Control
+	.i_clk      	(clk),
+	.i_start 		(fsm_curr == FSM_INTERIM_2),
 
-assign s_inv_tmp[0][0] = s_mat[1][1];
-assign s_inv_tmp[1][1] = s_mat[0][0];
-assign s_inv_tmp[0][1] = ~(|s_mat[0][1]) ? s_mat[0][1] : s_mat[0][1] ^ FLIP_SIGN;
-assign s_inv_tmp[1][0] = ~(|s_mat[1][0]) ? s_mat[1][0] : s_mat[1][0] ^ FLIP_SIGN;
+	// Input Data
+	.i_dividend 	(one_fix),
+	.i_divisor  	(s_mat[0][0]),
+
+	// Output Control
+	.o_complete		(division_done),
+
+	// Output Data
+	.o_quotient_out (s_div),
+
+	// Output Overflow
+	.o_overflow		(division_overflow)
+
+);
 
 generate
-	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: s_inv_tmp_rows
-		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: s_inv_tmp_cols
-		qdiv#(
-			.Q 			(ARCH_F),
-			.N 			(ARCH_W)
-		) s_inv_div (
-			// Input Control
-			.i_clk      	(clk),
-			.i_start 		(fsm_curr == FSM_INTERIM_2),
-
-			// Input Data
-			.i_dividend 	(s_inv_tmp[i][j]),
-			.i_divisor  	(s_det),
-
-			// Output Control
-			.o_complete		(division[i][j]),
-
-			// Output Data
-			.o_quotient_out (s_inv_tmp2[i][j])
-
-		);
+	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: gen_s_inv
+		always @(posedge clk) begin
+			if (fsm_clear_tmp) 									s_inv[i][i] <= 'd0;
+			else if ((fsm_curr == FSM_DIVIDE) & division_done)  s_inv[i][i] <= s_div;
+			else 												s_inv[i][i] <= s_inv[i][i];
 		end
 	end
 endgenerate
 
-generate
-	for (i = 0; i < NUM_MEASUR; i = i + 1) begin: s_inv_rows
-		for (j = 0; j < NUM_MEASUR; j = j + 1) begin: s_inv_cols
-			always @(posedge clk) begin
-				if (fsm_clear_tmp) 									s_inv[i][j] <= 'd0;
-				else if ((fsm_curr == FSM_DIVIDE) & division_done)  s_inv[i][j] <= s_inv_tmp2[i][j];
-				else 												s_inv[i][j] <= s_inv[i][j];
-			end
-		end
-	end
-endgenerate
+always @(posedge clk) begin s_inv[0][1] = 'd0; end
+always @(posedge clk) begin s_inv[1][0] = 'd0; end
 
 // K Matrix - 4x2 matrix (left half of p_next) times a 2x2 matrix (s inverse)
 generate
@@ -569,7 +541,8 @@ generate
 				) mult_k (
 			 		.i_multiplicand (p_next[i][k]),
 			 		.i_multiplier	(s_inv[k][j]),
-			 		.o_result		(k_mat_mult[i][j][k])
+			 		.o_result		(k_mat_mult[i][j][k]),
+			 		.ovr 			(k_mat_over[i][j][k])
 				);
 			end
 		end
@@ -613,7 +586,8 @@ generate
 			) mult_x_curr (
 		 		.i_multiplicand (k_mat[i][j]),
 		 		.i_multiplier	(y_vec[j]),
-		 		.o_result		(x_curr_mult[i][j])
+		 		.o_result		(x_curr_mult[i][j]),
+		 		.ovr 			(x_curr_over[i][j])
 			);			
 		end
 	end
@@ -679,7 +653,8 @@ generate
 				) mult_p_curr (
 			 		.i_multiplicand (p_curr_diff[i][k]),
 			 		.i_multiplier	(p_next[k][j]),
-			 		.o_result		(p_curr_mult[i][j][k])
+			 		.o_result		(p_curr_mult[i][j][k]),
+			 		.ovr 			(p_curr_over[i][j][k])		 		
 				);
 			end
 		end

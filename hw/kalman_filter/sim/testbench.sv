@@ -3,7 +3,7 @@
 module testbench();
 
 // Simulation Params
-localparam LOOP_ITER = 10;
+localparam LOOP_ITER = 100;
 localparam DELAY = 1000;
 
 // Display Size
