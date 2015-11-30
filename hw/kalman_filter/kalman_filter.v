@@ -108,6 +108,9 @@ localparam LINES_ODD_END    	= LINES_ODD_START  + VGA_RES_V_ACT_2;
 localparam LINES_EVEN_START 	= LINES_ODD_END    + LINES_ODD_START + 1;  
 localparam LINES_EVEN_END   	= LINES_EVEN_START + VGA_RES_V_ACT_2;
 
+// Motion Tracking Feautre
+localparam BASE_FRAME_PERIOD   	= 'd26700000;
+
 // Global Reset
 wire 						aresetn;
 
@@ -161,14 +164,29 @@ wire [(DISP_WIDTH-1):0]		vga_x;				// VGA horizontal position
 wire [(DISP_WIDTH-1):0]		vga_y;				// VGA vertical position
 wire						vga_ready;			// VGA data request
 
+// Motion Tracking Feature
+wire 						mot_or_obj;
+wire 						multi_latch;
+reg  [24:0]					latch_counter;
+
 // Map user control to peripherals
 assign aresetn 		=  KEY[0];
 assign grab_base 	= ~KEY[1];
+assign mot_or_obj 	=  SW[13];
 assign enable_kal   =  SW[14];
 assign filter_delta =  SW[15];
 assign track_object =  SW[16];
 assign disp_delta   =  SW[17];
 assign sat_thresh   =  SW[(COLOR_WIDTH-1):0];
+
+// Motion Tracking Feature
+always @(posedge TD_CLK27 or negedge aresetn) begin
+	if (~aresetn)									latch_counter <= 'd0;
+	else if (latch_counter == BASE_FRAME_PERIOD)	latch_counter <= 'd0;
+	else 											latch_counter <= latch_counter + 1;
+end
+
+assign multi_latch = (latch_counter > BASE_FRAME_PERIOD);
 
 // Video Input Decode Pipeline
 video_input video_input_inst
@@ -266,7 +284,7 @@ sram_wrapper sram_wrapper_inst
 	.aresetn 	(aresetn),
 
 	// Wrapper Signals
-	.wen 		(grab_base),
+	.wen 		(mot_or_obj ? grab_base : multi_latch),
 	.addr 		({vga_x[9:0], vga_y[9:0]}),
 	.din		(sdram_output),
 	.dout 		(sram_output),
