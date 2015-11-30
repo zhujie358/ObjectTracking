@@ -62,6 +62,7 @@ localparam FLIP_SIGN     = {1'b1, {(ARCH_W-1){1'b0}}};
 localparam ONE_FI 		 = ('b0 << (ARCH_W-1)) | ('b1 << ARCH_F) | 'b0;
 localparam TSTEP_FI 	 = ('b0 << (ARCH_W-1)) | ('b0 << ARCH_F) | 'b000000111111100;
 localparam RDIAG_FI      = ('b0 << (ARCH_W-1)) | ('d1000 << ARCH_F) | 'b0; 
+localparam TEN_FI		 = ('b0 << (ARCH_W-1)) | ('d10 << ARCH_F) | 'b0;
 
 /////////////////////////////// INTERNAL SIGNALS & VARIABLES ///////////////////////////////////
 
@@ -185,7 +186,7 @@ assign one_fix 		 = ONE_FI;
 // Set x_init to zeros, and p_init and q_mat to identity. Set f_mat to identity with t_step.
 generate
 	for (i = 0; i < NUM_STATES; i = i + 1) begin: gen_vec_init
-		assign x_init[i] = 'd0;
+		assign x_init[i] = TEN_FI;
 		for (j = 0; j < NUM_STATES; j = j + 1) begin: gen_mat_init
 			if (i == j) 
 				begin
