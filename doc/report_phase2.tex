@@ -168,7 +168,12 @@ This is where you should cite \cite{13} and talk about the video input wrapper m
 \subsection{Storing the Base Frame}
 This is where you should cite \cite{14} and talk about the SRAM.
 \subsection{RGB to Grayscale Conversion}
-Simple discussion here.
+The purpose of this module is to convert RGB values into a single grayscale value. The sample video pipeline provided by Terasic (encapsulated into the "Video Input" module) outputs red, green, and blue pixel data into separate 10-bit registers. For simplicity in thresholding, filtering, and subsequent delta frame generation, it was not necessary to handle 3 channels of data. Converting to a single grayscale value would be sufficient for the rest of the algorithm's implementation. A grayscale value, or luminance $Y$, is achieved by performing a weighted sum of the RGB values,
+\begin{equation}
+Y =  0.2126\times R + 0.7152\times G + 0.0722\times B
+\end{equation}
+The coefficients represent the measured intensity perception of typical human eyesight. The resulting grayscale value will be in the range from 0 (total black) to 255 (total white). This equation had to be adjusted for fixed point arithmetic since it uses fractional coefficients. A fractional width of 6 was used. The coefficients were converted to binary and left shifted by 6. The output grayscale value only maintains the most significant 10 bits of the calculation, essentially slicing the fractional portion to obtain the correct result. The equation is performed when a valid data signal is enabled by the previous "Video Input" module. A valid out signal was also introduced to maintain synchronization for the next module in the pipeline. This signal is enabled when valid input data is ready. 
+
 \subsection{Modified Video Pipeline}
 Talk about moving the RGB conversion further upstream prior to the SDRAM such that we can work in RGB.
 \subsubsection{Delta Frame Generation}
@@ -176,7 +181,10 @@ Discuss the poor man's absolute value implemented and the saturation filter.
 \subsubsection{Moving Average Filter}
 Show the two pictures of the before/after moving average filter here.
 \subsection{Measuring Object Position}
-Make sure to mention it's using the VGA module counters.
+The delta frame data is used to identify the $(x,y)$ coordinates of the object. For this step in the pipeline, one module was designed to calculate the $(x,y)$ coordinate, marking the centre of the object in the frame. Another module was developed to colour the location of the object in the frame for visual identification on the monitor. \\\\
+To measure the position of the object, several input data sources were utilized. The input delta frame data is binary. All ones in the delta frame register represent and object pixel, while all zeroes represents the background. When an object pixel is received, the register that holds the total number of object pixels is incremented and the $x$ and $y$ coordinate sum registers are also respectively incremented by the current $x$ and $y$ locations of the object pixel in the frame. The $x$ and $y$ locations are received from the VGA module position outputs. These position sources were used instead of internal counters to ensure that processing is synchronized with the output. Using this process, all the necessary data for equations (2) and (3) are satisfied and the calculation can be preformed under a valid signal condition to obtain the centre of the object. The result is calculated and ready for output when the last pixel in the frame is received and processed. At the beginning of each new frame all data is reset for a fresh calculation. The end of the frame is identified when the $x$ and $y$ location values have reached their max resolution values of 640 and 480 respectively. If no object is in the frame, we don't want to identify noise as an object. To prevent this from happening, a simple threshold was implemented. If the total count of object pixels is less than 40 then the $x$ and $y$ location will be set to a value that is not to be displayed on the monitor. \\\\
+The second module utilizes the raw $(x,y)$ coordinates and the updated Kalman $(x,y)$ coordinates to display visual identification of the object on the monitor. The pixels around the raw coordinates are coloured as a red box while the pixels around the Kalman coordinates are coloured as a green box. The incoming $(x,y)$ VGA position coordinate is monitored. If a $(x,y)$ position is within 20 pixels of the object's position, then that pixel is coloured red. The same process is repeated comparing VGA position to Kalman $(x,y)$ coordinates, but instead colouring the pixels green. The result on the monitor shows a red box tracking the object and a green box following the object moving accordingly to Kalman filter specifications. 
+
 \subsection{Kalman Filter}
 Lots of meat here.
 \section{Testing \& Verification}
