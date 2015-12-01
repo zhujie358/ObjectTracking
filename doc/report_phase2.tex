@@ -6,6 +6,7 @@
 \usepackage[utf8]{inputenc} % Font encoding
 \usepackage[margin=1.0in]{geometry} % Adjust margins
 \usepackage{graphicx} % Allows picture import
+\usepackage{subcaption}
 \usepackage{pdfpages} % Including pdf files 
 \usepackage{setspace}
 \usepackage{soul} % Highlighted text
@@ -87,6 +88,7 @@ The ability to determine the position of an object in a scene is a highly releva
 This section contains the prerequisite information regarding video tracking needed to understand the system architecture and design. For background information regarding the basics of video processing, Kalman filtering, fixed-point representation, and optical flow, please see \cite{phase1}. \\\\
 \hl{TODO:} Is just referencing this background information enough? Or do we need to repeat the Kalman equations, delta frame generation, and other topics again?
 \subsection{Moving Average Filter}
+\label{sec:filter}
 A moving average filter replaces the current input data sample with a mean of some number of past input data samples. The number is referred to as the moving average filter length, $N$. This type of filter is particularly useful when data samples are arriving in a time series (i.e. at constant time intervals) as it will remove outliers, creating a smoother trend in data samples. Given that $p_i$ is the current input data sample, the filtered results, $p_i'$, is given using the following equation,
 \begin{equation}
 p_i' = \frac{\sum_{k = i}^{i + N} p_{k-N}}{N}
@@ -192,6 +194,7 @@ The next logical step after getting video output working was to get video input 
 \FloatBarrier
 The input video stream of the camera used is NTSC format. The analog NTSC signal enters the ADV7181 via an RCA (yellow) connector on the DE2 board, and gets converted into an 8-bit, serial stream of digital data which is encoded using the ITU-R BT.656-5 protocol. This protocol encodes pixel values in interlaced (only even or odd rows) YCbCr format, using horizontal and vertical synchronization signals for timing references \cite{itu}. The low-level details of how the serial data gets converted YCbCr pixel color values are not important, as the Terasic \texttt{ITU656\_Decoder.v} module abstracts this away and deals with the protocol. The division module is used to downsample the input video from $720 \times 480$ to $640 \times 480$ to match the VGA display. After this, the YCbCr pixel data is stored in the SDRAM frame buffer. The SDRAM frame buffer is a set of Verilog modules written by Terasic that abstract the off-chip SDRAM as a FIFO buffer. The FIFO has one write side, where data enters after the \texttt{ITU656\_Decoder.v} module, and two read sides, which are used to extract the data in a non-interlaced format. The multiplexer at the output of the frame buffer in Figure \ref{fig:basicPipe} illustrates this logic. So the first half of the addressable space in the frame buffer stores the odd lines, and the second half stores the even lines. The data is extracted from one of these address spaces depending on the last bit of the VGA display counters (i.e. the current VGA position). The pixel data is upsampled and converted to RGB, and finally displayed using the VGA module discussed in the previous section. This video pipeline was wrapped in module called \texttt{pipeline\_wrapper.v} for future use, and also was commented and parameterized for readability.
 \subsection{Modified Video Pipeline \#1}
+\label{sec:modPipe}
 Modifications would need to made to the video pipeline just presented in order to make it compatible with our algorithm. The first step in the object tracking algorithm is to convert the RGB pixel colors to grayscale, and working with the YCbCr color space is not desirable. Also, decoupling the input video decoding from the frame buffer would give more design flexibility. Based on these factors, it was determined that a video pipeline that resembles Figure \ref{fig:algoPipe} would be more ideal for integrating the object tracking algorithm. To implement this video pipeline, the upsampling and RGB conversion was pushed further upstream, before the SDRAM frame buffer. Then the Terasic modules \texttt{ITU656\_Decoder.v}, \texttt{YUV422\_to\_444.v}, and \texttt{YCbCr2RGB.v} were wrapped into a module called \texttt{Video\_Input.v}. This decoupled all video decoding from the rest of the pipeline. \\\\
 \FloatBarrier
 \begin{figure}[h]
@@ -222,12 +225,92 @@ The SRAM has a large bus of signals that must be driven by the FPGA. In order to
 \item Input Data - Input: \texttt{din}
 \item Output Data - Output: \texttt{dout}
 \end{itemize}
-Sometimes an overall enable signal is used, but this was not necessary. These signals, as well as a clock and reset, define the input/output signals for the SRAM controller that was implemented in the module \texttt{sram\_wrapper.v}. This module is quite simple, and simply drives the signals according to the datasheet specifications in \cite{sram}. The only challenge in developing this module was figuring out how to using the bidirectional data port, \texttt{SRAM\_DQ}, which required using two internal registers and three flip-flops.
+Sometimes an overall enable signal is used, but this was not necessary. These signals, as well as a clock and reset, define the input/output signals for the SRAM controller that was implemented in the module \texttt{sram\_wrapper.v}. This module is quite simple, and simply drives the signals according to the datasheet specifications in \cite{sram}. The only challenge in developing this module was figuring out how to using the bidirectional data port, \texttt{SRAM\_DQ}, which required using two internal registers and three flip-flops. \\\\
+The write operation, and general control flow, was verified through simulation. A testbench was written to drop multiple data and address values in series into the wrapper to observe it's operation. Unfortunately, the read operation could not be verified through simulation since we did not have a HDL model of the SRAM available to us. Verification of the read operation had to be put off until system integration.
 \subsection{Modified Video Pipeline \#2}
+The next step in the design process was incorporating the previous two modules, RGB to grayscale conversion and the SRAM controller, into the video pipeline. Upon successful integration, it would be possible to view the delta frame (i.e. the object pixels) on the display. \\\\
+The first step was integrating the SRAM controller into the video pipeline. After some experimentation, it was determined that the SRAM should be placed after the SDRAM frame buffer in order to decouple it from the video decoding process. The SRAM address is determined by a concatenation of the x and y addresses of the VGA display. The write enable is mapped to a user controlled switch. The RAM interface portion of the SRAM wrapper module instantiation is shown here:
+\begin{verbatim}
+	// Wrapper Signals
+	.wen  (~KEY[1]),
+	.addr ({vga_x[9:0], vga_y[9:0]}),
+	.din  (sdram_output),
+	.dout (sram_output),
+\end{verbatim}
+Initially it was suspected that there would need to be constraints on how long the write enable signal was applied, in order to ensure that a full frame had been stored into the SRAM. However this was found to be unnecessary, as the user will almost certainly hold the write enable button for more than a 16 ms period (60 Hz frame rate), and assuming the base frame remains constant while the button is held, any overwriting of the previous base frame would not matter. \\\\
+The initial plan for integration of the RGB to grayscale conversion module was to place one instance after both the SDRAM and SRAM outputs. This would constantly convert the current and base frames to grayscale for delta frame computation, and would allow the system to still display color output (the grayscale would just be for computation, and the SDRAM color output would still be sent to the VGA display). However, since the 30-bit RGB had already been truncated to 16-bit high color for data width constraints (as discussed in section \ref{sec:modPipe}), the result still looked somewhat grayscale anyways. So it was decided to push the module before the SDRAM frame buffer, and just work with 10-bit grayscale for both computation and display. This decision also means that only one instance of the module is required instead of two, which saves FPGA resources. Figure \ref{fig:pipe2} shows the new video pipeline after these two modules were integrated, and a module to compute the delta frame which will be discussed next.
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.6\textwidth]{./images/new_pipeline_2.jpg}
+\caption{Video Pipeline - Delta Frame System}
+\label{fig:pipe2}
+\end{figure}
 \subsubsection{Delta Frame Generation}
-\hl{TODO:} Discuss the absolute value and the saturation filter.
+The module \texttt{delta\_frame.v} constantly computes the difference between the current frame (from the SDRAM frame buffer) and the base frame (from the SRAM). An example of the result the delta frame produces is shown in Figure \ref{fig:delta}.
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.6\linewidth]{./images/delta_frame_1}
+  \caption{Object (hand) in the base frame}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.6\linewidth]{./images/delta_frame_2}
+  \caption{Delta frame representation of the object}
+\end{subfigure}
+\caption{Delta Frame Example}
+\label{fig:delta}
+\end{figure}
+This module is very straight forward, but does have a few features that are worth noting. First, the delta frame is taken to be an absolute value difference, since negative pixel intensity would not make sense. A simple implementation of an absolute value in Verilog is done with the following code:
+\begin{verbatim}
+if (curr_frame > base_frame)  int_delta_frame <= curr_frame - base_frame;
+else                          int_delta_frame <= base_frame - curr_frame;
+\end{verbatim}
+The delta frame looks considerably better, and more importantly data processing is significantly easier if all the pixels in the delta frame binary. Meaning each pixel in the delta frame is either 0 (black), representing no object present or 1 (white), representing an object present. To accomplish this, a saturation filter was implemented in the delta frame. This means that if the difference between the two frames is above a predetermined threshold, the value is set to a string of all ones, and otherwise it is set to a string of all zeros. The Verilog code is to implement this is shown here, with the parameter \texttt{COLOR\_WIDTH} representing the number of bits in the binary string:
+\begin{verbatim}
+assign delta_frame = (delte_frame > threshold) ? 
+						{COLOR_WIDTH{1'b1}} :
+						{COLOR_WIDTH{1'b0}};
+\end{verbatim}
 \subsubsection{Moving Average Filter}
-\hl{TODO:} Show the two pictures of before and after the moving average filter.
+Since the object position is entirely dependent on the delta frame, making sure the delta frame does not contain small variations in light and background is very important to the system. In software implementation during Phase 1, mean and median filters were applied to the delta frame to remove spurious object values. Since the data flow is by pixels and not by individual frames, these filters cannot be easily implemented in the video pipeline. A moving average filter, explained in section \ref{sec:filter}, is a much better choice for this system, since it will only require storing the as many past pixels as the filter length, and it doesn't require any \textit{a priori} knowledge about the frame. A moving average filter was implemented in the module \texttt{delta\_frame.v}. Using an array and the \texttt{generate} keyword in Verilog allows for a very tight and simple implementation of this filter:
+\begin{verbatim}
+generate 
+for (c = 0; c < FILTER_LENGTH; c = c + 1) begin: moving_avg_filter
+    always @(posedge clk or negedge aresetn) begin
+        if (~aresetn)           old[c] <= 'd0;
+        else if (~is_not_blank) old[c] <= 'd0;
+        else if (counter == c)  old[c] <= int_delta_frame;
+        else                    old[c] <= old[c];
+    end
+end
+endgenerate
+
+always @* begin
+    sum = 'd0;
+    for (i = 0; i < FILTER_LENGTH; i = i + 1)
+        sum = sum + old[i];
+end
+
+assign avg = sum / FILTER_LENGTH;
+\end{verbatim}
+The \texttt{counter} variable constantly counts from 0 to the filter length. Integer division can be applied to the sum since precision is not of a concern. The result is put into the saturation filter instead of the raw difference, to provide a smoother result. Figure \ref{fig:filter} shows the delta frame representation of a plain wall base frame before and after the moving average filter. Since there is no object in the frame, an entirely black screen is the ideal result. It was experimentally determined that a filter length of 20 gave the best results.
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.6\linewidth]{./images/base_no_filter.jpg}
+  \caption{Base Frame: No filter}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=.6\linewidth]{./images/base_filter_20.jpg}
+  \caption{Base Frame: Moving average filter of length 20}
+\end{subfigure}
+\caption{Moving Average Filter}
+\label{fig:filter}
+\end{figure}
 \subsection{Measuring Object Position}
 The delta frame data is used to identify the $(x,y)$ coordinates of the object. For this step in the pipeline, one module was designed to calculate the $(x,y)$ coordinate, marking the centre of the object in the frame. Another module was developed to colour the location of the object in the frame for visual identification on the monitor. \\\\
 To measure the position of the object, several input data sources were utilized. The input delta frame data is binary. All ones in the delta frame register represent and object pixel, while all zeroes represents the background. When an object pixel is received, the register that holds the total number of object pixels is incremented and the $x$ and $y$ coordinate sum registers are also respectively incremented by the current $x$ and $y$ locations of the object pixel in the frame. The $x$ and $y$ locations are received from the VGA module position outputs. These position sources were used instead of internal counters to ensure that processing is synchronized with the output. Using this process, all the necessary data for equations (2) and (3) are satisfied and the calculation can be preformed under a valid signal condition to obtain the centre of the object. The result is calculated and ready for output when the last pixel in the frame is received and processed. At the beginning of each new frame all data is reset for a fresh calculation. The end of the frame is identified when the $x$ and $y$ location values have reached their max resolution values of 640 and 480 respectively. If no object is in the frame, we don't want to identify noise as an object. To prevent this from happening, a simple threshold was implemented. If the total count of object pixels is less than 40 then the $x$ and $y$ location will be set to a value that is not to be displayed on the monitor. \\\\
@@ -284,7 +367,4 @@ D. Kohanbash. (2014, January 30). \textit{Kalman Filtering - A Practical Impleme
 \bibitem{vga} \textit{VESA and Industry Standards and Guidelines for Computer Display Monitor Timing (DMT)}, Video Electronics Standards Association, Version 1, Revision 11.
 \bibitem{phase1} B. Brown \& T. Dotsikas, “A Real-Time Object Tracking System”, ECSE 456 Final Report, unpublished.
 \end{thebibliography}
-\newpage
-\appendix
-\appendixpage
 \end{document}
