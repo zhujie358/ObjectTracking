@@ -15,7 +15,7 @@
 \graphicspath{{images/}} % Allows picture import
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{A Real-Time Object Tracking System}
+\fancyhead[L]{Research \& Development of a Real-Time Object Tracking System}
 \fancyhead[R]{ECSE 457}
 \fancyfoot[C]{\thepage}
 \renewcommand{\headrulewidth}{1pt}
@@ -64,7 +64,7 @@ Arash \textsc{Ardakani}
 \end{titlepage}
 \pagebreak
 \section*{Abstract}
-This project aimed to research object tracking algorithms, and implement the algorithm best suited to meet project requirements in both software and hardware. The software implementation used static input videos and the hardware implementation used a real-time input video stream. Phase 1 of the project focused on algorithm research and software implementation, and is documented in \cite{15}. Phase 2 of the project focused on hardware implementation, and this report encompasses all of Phase 2 from the design process to the final results. It was found that hardware implementation of the algorithm provides a much faster way of tracking an object when compared to the equivalent software implementation. It was also found that using a background subtraction, delta frame based algorithm to determine object position is not the best choice for real-time situations, due to the inability to cope with lighting and background variations. It was also found that while a Kalman filter does greatly improve object tracking results, it comes at a heavy cost in terms of hardware utilization.
+This project aimed to research object tracking algorithms, and implement the algorithm best suited to meet project requirements in both software and hardware. The software implementation used static input videos and the hardware implementation used a real-time input video stream. Phase 1 of the project focused on algorithm research and software implementation, and is documented in \cite{phase1}. Phase 2 of the project focused on hardware implementation, and this report encompasses all of Phase 2 from the design process to the final results. It was found that hardware implementation of the algorithm provides a much faster way of tracking an object when compared to the equivalent software implementation. It was also found that using a background subtraction, delta frame based algorithm to determine object position is not the best choice for real-time situations, due to the inability to cope with lighting and background variations. It was also found that while a Kalman filter does greatly improve object tracking results, it comes at a heavy cost in terms of hardware utilization.
 \section*{Acknowledgments}
 We would like to thank Professor Warren Gross and Arash Ardakani for overseeing this project and providing advice, insight, and direction over the course of the year. We would also like to thank Analog Devices for providing us with the Altera DE2 board needed for hardware implementation, and in particular Leah Magaldi for being our main point of contact. Finally, the example TV decoder Verilog code provided by Terasic was a major asset for hardware implementation, we would like to thank them for making it open and available to developers like ourselves. 
 \pagebreak
@@ -75,12 +75,16 @@ We would like to thank Professor Warren Gross and Arash Ardakani for overseeing 
 \item[] FPGA - Field Programmable Gate Array
 \item[] VGA - Video Graphics Array
 \item[] HDL - Hardware Description Language
+\item[] FIFO - First In First Out
+\item[] SDRAM - Synchronous Dynamic Random Access Memory
+\item[] SRAM - Static Random Access Memory
+\item[] RAM - Random Access Memory
 \end{itemize}
 \section{Introduction}
 The ability to determine the position of an object in a scene is a highly relevant challenge for industries like surveillance and robotics. This task represents a challenge from an engineering perspective due to the real-time timing constraints placed on these systems, and the large amount of data that must be processed when working with video data. In order to overcome these challenges, custom hardware implementation has become an increasingly popular solution as demonstrated in \cite{1}, \cite{2}, and \cite{3}. \\\\
 \hl{TODO:} This section needs more work.
 \section{Background}
-This section contains the prerequisite information regarding video tracking needed to understand the system architecture and design. For background information regarding the basics of video processing, Kalman filtering, fixed-point representation, and optical flow, please see \cite{15}. \\\\
+This section contains the prerequisite information regarding video tracking needed to understand the system architecture and design. For background information regarding the basics of video processing, Kalman filtering, fixed-point representation, and optical flow, please see \cite{phase1}. \\\\
 \hl{TODO:} Is just referencing this background information enough? Or do we need to repeat the Kalman equations, delta frame generation, and other topics again?
 \subsection{Moving Average Filter}
 A moving average filter replaces the current input data sample with a mean of some number of past input data samples. The number is referred to as the moving average filter length, $N$. This type of filter is particularly useful when data samples are arriving in a time series (i.e. at constant time intervals) as it will remove outliers, creating a smoother trend in data samples. Given that $p_i$ is the current input data sample, the filtered results, $p_i'$, is given using the following equation,
@@ -100,7 +104,7 @@ end
 \end{lstlisting} 
 This makes the data set binary, in the sense that all values are one of two values, and makes data processing significantly easier. In the context of object tracking, values above the threshold indicate an object present in the scene, and values below indicate no object present.
 \subsection{Determining Position}
-The algorithm implemented in software, and presented in \cite{15}, for determining the $(x,y)$ position of an object in the delta frame used a rastor scan technique to determine the leftmost, rightmost, top, and bottom pixels. By intersecting two lines formed between these points, the center of the object can be estimated. It was found that despite the success of this algorithm in software, it would not be conducive to hardware implementation. This is mainly due to the fact that in the software implementation, data arrived in discrete frames from MATLAB's \texttt{VideoReader} class at constant time steps. In hardware implementation, data is handled at the pixel level, with a constant stream of pixels being placed in and extracted from a FIFO frame buffer storage module (to be discussed later). Thus using an algorithm that requires an entire frame requires more memory and extra logic. A new algorithm was developed to determine the local of the object. \\\\
+The algorithm implemented in software, and presented in \cite{phase1}, for determining the $(x,y)$ position of an object in the delta frame used a rastor scan technique to determine the leftmost, rightmost, top, and bottom pixels. By intersecting two lines formed between these points, the center of the object can be estimated. It was found that despite the success of this algorithm in software, it would not be conducive to hardware implementation. This is mainly due to the fact that in the software implementation, data arrived in discrete frames from MATLAB's \texttt{VideoReader} class at constant time steps. In hardware implementation, data is handled at the pixel level, with a constant stream of pixels being placed in and extracted from a FIFO frame buffer storage module (to be discussed later). Thus using an algorithm that requires an entire frame requires more memory and extra logic. A new algorithm was developed to determine the local of the object. \\\\
 This algorithm assumes that pixel data arrives in binary format; either a string of all zeros representing no object present or a string of all ones representing an object present. Note that this data format is achieved by using the saturation filter just discussed. The algorithm tests if the pixel is an object pixel or not, and if it is the $x$ and $y$ coordinates of the pixel are each added to a rolling summation ($x_{sum}$ and $y_{sum}$). A counter, $n$, is also incremented At the end of the frame, the rolling summations are divided by the counter, the position is outputted, and the three values are cleared. This algorithm is essentially just taking an average of the $(x,y)$ coordinates of the object pixels as the center of the object.
 \begin{equation}
 x = \frac{x_{sum}}{n}
@@ -112,22 +116,23 @@ Note that this algorithm achieves best results when the object is highly symmetr
 \subsection{Video Pipeline}
 The phrase \textit{video pipeline} refers to a series of image processing modules that exist between the video input device (e.g. the camera) and the video output device (e.g. the display). The pipeline can be implemented in software or hardware, but for the scope of this report the pipeline will refer to hardware implementation, and modules will be referred to in the Verilog sense. Modules in the video pipeline generally consist of decoding and encoding the video data into various formats, and performing video processing (e.g. applying algorithms of interest) in the middle. Implementing a video pipeline is directly coupled with implementing an object tracking algorithm in hardware, as there are no libraries or classes to convert and store the incoming video data when working at this low of a level.
 \subsection{The VGA Interface}
+\label{sec:vga}
 The ADV7123 High-Speed Video DAC converts three 10-bit RGB digital signals to the corresponding analog signals needed to transmit video data using the VGA interface. To give the user flexibility with timing and resolution, it does not generate the digital synchronization signals. These two signals are horizontal and vertical synchronization (sync). To properly generate these signals and thus drive the VGA interface, the VGA timing specifications must be understood. \\\\ 
 A VGA display generates images using a rastor scan technique. The display is a grid of pixels, and each pixel is displayed individually starting at the top left corner, moving left to right in rows, and ending in the bottom right corner. This operation occurs at a speed known as the refresh rate. The refresh rate is fast enough such that the user perceives an entire image display instantaneously, despite the fact that the image is being displayed discretely per pixel. Due to the motion just described, VGA timing specifications are described in terms of horizontal (i.e. the rows) and vertical (i.e. the number of rows) parameters. VGA resolution is described in terms of the number of visible pixels in a single row, and the total number of visible rows in the display. It is important to note that the number of visible pixels and rows is less than the total number of pixels and rows, as there are blanking periods due to timing constraints. The final term that should be defined is the pixel clock, $f_{pixel}$. The pixel clock is used to count each pixel in the grid, and is much faster than the refresh rate. In fact, the refresh rate of a VGA display can be related to the pixel clock and VGA resolution,
 \begin{equation}
 f_{refresh} = \frac{f_{pixel}}{H_{pixels} \times V_{lines}}
 \end{equation}
- Figure \ref{fig:vgaTiming} shows the timing specifications, and has four notable regions: front porch, back porch, sync, and active video \cite{16}. 
+ Figure \ref{fig:vgaTiming} shows the timing specifications, and has four notable regions: front porch, back porch, sync, and active video \cite{vga}. 
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.8\textwidth]{./images/vgaTiming.jpg}
-\caption{VGA Timing Signals \cite{16}}
+\caption{VGA Timing Signals \cite{vga}}
 \label{fig:vgaTiming}
 \end{figure}
 As the figure shows, the front porch, back porch, and sync regions form what is known as the blanking period, since no valid video data is displayed during this period. The horizontal sync signal must be pulsed (high or low depending on polarity) prior to the valid data is displayed on each row, for a specific amount of time depending on resolution. Similarly, the vertical sync signal must be pulsed prior to the entire frame is displayed. For the typical $640 \times 480$ VGA resolution, the timing constraints shown in Table \ref{table:vga}. \\\\
 \begin{table}[h]
 \centering
-\caption{$640 \times 480$ VGA Timing Specifications \cite{16}}
+\caption{$640 \times 480$ VGA Timing Specifications \cite{vga}}
 \label{table:vga}
  \begin{tabular}{ | p{4cm} | p{4cm} | p{4cm} |} \hline
 Region & Time & Pixels \\ \hline
@@ -141,9 +146,9 @@ Ver. Back Porch & 1.048 ms & 33 \\ \hline
 Ver. Visible & 15.523 ms & 480\\ \hline
 \end{tabular}
 \end{table}
-\textit{Note: Some specifications, such as \cite{16}, add two more regions denoted left and right borders. However, since they are functionally irrelevant for this application, they have been lumped into the front and back porches respectively for this discussion.}
+\textit{Note: Some specifications, such as \cite{vga}, add two more regions denoted left and right borders. However, since they are functionally irrelevant for this application, they have been lumped into the front and back porches respectively for this discussion.}
 \section{Requirements}
-Due to the fact that the scope of the project did not change between Phases 1 and 2, the requirements listed in this section are largely based off of the Phase 1 report \cite{15}. Some additional requirements were added at the beginning of Phase 2 when hardware implementation became clearer.
+Due to the fact that the scope of the project did not change between Phases 1 and 2, the requirements listed in this section are largely based off of the Phase 1 report \cite{phase1}. Some additional requirements were added at the beginning of Phase 2 when hardware implementation became clearer.
 \subsection{Time Frame}
 The project shall be completed by December 2015. The project will be broken into two phases. Phase 1 of the project will be January - April 2015, and Phase 2 of the project will be September - December 2015.
 \subsection{Algorithm}
@@ -161,42 +166,83 @@ The system hardware shall be an Altera DE2 breakout board. This breakout board c
 \subsubsection{Method}
 The system hardware shall be implemented using Verilog HDL. The sample designs included with the Altera DE2 breakout board include Verilog modules for video input decoding. In order to utilize these resources and avoid mixing languages, Verilog is the logical choice.
 \section{Design}
+The hardware implementation design process was organized into experiments. Each experiment focused on investigating, implementing, or integrating a specific function into the overall system. The experiments were chronological, and built on work from the previous experiments. This section has been organized in the same chronological fashion, in order to explain and justify the system design in the manner it was developed.
 \subsection{Generating VGA Output}
-Make sure mention the design references for this.
+The first experiment was focused on generating an arbitrary VGA output using the Cyclone IV FPGA and the ADV7123. Section \ref{sec:vga} explained the motive and theory behind this. The module \texttt{vga\_sync.v} was written to implement the VGA functionality. The module takes as input the 27 MHz global clock, the global asynchronous reset, and the RGB data. The module drives the following bus of signals as an output:
+\begin{itemize}
+\item \texttt{VGA\_HS} - Horizontal sync pulse, driven directly to the VGA interface.
+\item \texttt{VGA\_VS} - Vertical sync pulse, driven directly to the VGA interface.
+\item \texttt{VGA\_R, VGA\_G, VGA\_B} - 10-bit RGB data, driven to the ADV7123.
+\item \texttt{VGA\_BLANK\_N} - ADV7123 control signal, driven to the ADV7123.
+\item \texttt{VGA\_SYNC\_N} - ADV7123 control signal, driven to the ADV7123. 
+\item \texttt{VGA\_CLK} - ADV7123 pixel clock, driven to the ADV7123.
+\end{itemize}
+To achieve the necessary timing specifications for the $640 \times 480$ resolution discussed in section \ref{sec:vga}, two counters are implemented in hardware: one to count the pixels in a row, and another that counts the number of rows. The counters are used to drive the \texttt{VGA\_HS} and \texttt{VGA\_VS} signals for the specific synchronization periods. These counters also act as the primary way to track the position of the current pixel in the system, so the signals are sent to module outputs as well. The RGB color values are simply piped through the module to the ADV7123 when the counters are in the visible portion of the VGA timing. The design of this module was heavily based on the example \texttt{VGA\_Ctrl.v} module provided by Terasic with the DE2 board. \\\\
+Module verification was done qualitatively, and the top-level module for this experiment simply mapped some specific color values to the buttons on the DE2 board. By connecting the DE2 board to a VGA display, we could verify the module's functionality by observing if the expected colors showed when the buttons were pressed.
 \subsection{Simple Video Pipeline}
-This is where you should cite \cite{13} and talk about the video input wrapper module.
-\subsection{Storing the Base Frame}
-This is where you should cite \cite{14} and talk about the SRAM.
+\label{sec:pipe}
+The next logical step after getting video output working was to get video input working as well. Fortunately, Terasic provides an example Verilog design for a video input/output system on the DE2 board. Entitled the \textit{TV Decoder} example, it uses ADV7123 and the ADV7181, a multi-format video decoder integrated circuit (which also resides on the DE2 board), to display a live, color video feed on a VGA display. Due to the lack of parameters, organization, and comments in the example code, it was not simple to decipher the function of each module in the example pipeline. However, we were able to strip down the video pipeline and organize it an understandable way. This process consisted of removing various modules and logic, and observing the effect on the overall system performance (i.e. the quality of the video stream). Figure \ref{fig:basicPipe} shows the minimal pipeline needed to achieve a stable, live video feed.\\\\
+\FloatBarrier
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.6\textwidth]{./images/demoPipeline.jpg}
+\caption{Basic Video Input/Output Pipeline}
+\label{fig:basicPipe}
+\end{figure}
+\FloatBarrier
+The input video stream of the camera used is NTSC format. The analog NTSC signal enters the ADV7181 via an RCA (yellow) connector on the DE2 board, and gets converted into an 8-bit, serial stream of digital data which is encoded using the ITU-R BT.656-5 protocol. This protocol encodes pixel values in interlaced (only even or odd rows) YCbCr format, using horizontal and vertical synchronization signals for timing references \cite{itu}. The low-level details of how the serial data gets converted YCbCr pixel color values are not important, as the Terasic \texttt{ITU656\_Decoder.v} module abstracts this away and deals with the protocol. The division module is used to downsample the input video from $720 \times 480$ to $640 \times 480$ to match the VGA display. After this, the YCbCr pixel data is stored in the SDRAM frame buffer. The SDRAM frame buffer is a set of Verilog modules written by Terasic that abstract the off-chip SDRAM as a FIFO buffer. The FIFO has one write side, where data enters after the \texttt{ITU656\_Decoder.v} module, and two read sides, which are used to extract the data in a non-interlaced format. The multiplexer at the output of the frame buffer in Figure \ref{fig:basicPipe} illustrates this logic. So the first half of the addressable space in the frame buffer stores the odd lines, and the second half stores the even lines. The data is extracted from one of these address spaces depending on the last bit of the VGA display counters (i.e. the current VGA position). The pixel data is upsampled and converted to RGB, and finally displayed using the VGA module discussed in the previous section. This video pipeline was wrapped in module called \texttt{pipeline\_wrapper.v} for future use, and also was commented and parameterized for readability.
+\subsection{Modified Video Pipeline \#1}
+Modifications would need to made to the video pipeline just presented in order to make it compatible with our algorithm. The first step in the object tracking algorithm is to convert the RGB pixel colors to grayscale, and working with the YCbCr color space is not desirable. Also, decoupling the input video decoding from the frame buffer would give more design flexibility. Based on these factors, it was determined that a video pipeline that resembles Figure \ref{fig:algoPipe} would be more ideal for integrating the object tracking algorithm. To implement this video pipeline, the upsampling and RGB conversion was pushed further upstream, before the SDRAM frame buffer. Then the Terasic modules \texttt{ITU656\_Decoder.v}, \texttt{YUV422\_to\_444.v}, and \texttt{YCbCr2RGB.v} were wrapped into a module called \texttt{Video\_Input.v}. This decoupled all video decoding from the rest of the pipeline. \\\\
+\FloatBarrier
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.6\textwidth]{./images/desired_pipeline.jpg}
+\caption{Video Pipeline - Algorithm Integration}
+\label{fig:algoPipe}
+\end{figure}
+The only major issue with this pipeline modification is the amount of data that must be manipulated when using RGB. The YCbCr pixel data that was initially being stored required 16-bits, which conveniently is the width of the SDRAM data bus. After conversion to RGB, there are three 10-bit values that must be stored in the frame buffer. Initially this dealt with by truncating the 30-bit RGB representation to high-color representation, which uses 16-bit RGB with an extra bit for green. Eventually, the grayscale conversion (to be discussed) was moved upstream before the SDRAM frame buffer, since the 30-bit RGB representation gets converted to 10-bit grayscale anyways. This modification impacted performance, in the sense that the output video was now either almost or entirely grayscale looking, but it saved logic and memory.
 \subsection{RGB to Grayscale Conversion}
 The purpose of this module is to convert RGB values into a single grayscale value. The sample video pipeline provided by Terasic (encapsulated into the "Video Input" module) outputs red, green, and blue pixel data into separate 10-bit registers. For simplicity in thresholding, filtering, and subsequent delta frame generation, it was not necessary to handle 3 channels of data. Converting to a single grayscale value would be sufficient for the rest of the algorithm's implementation. A grayscale value, or luminance $Y$, is achieved by performing a weighted sum of the RGB values,
 \begin{equation}
 Y =  0.2126\times R + 0.7152\times G + 0.0722\times B
 \end{equation}
 The coefficients represent the measured intensity perception of typical human eyesight. The resulting grayscale value will be in the range from 0 (total black) to 255 (total white). This equation had to be adjusted for fixed point arithmetic since it uses fractional coefficients. A fractional width of 6 was used. The coefficients were converted to binary and left shifted by 6. The output grayscale value only maintains the most significant 10 bits of the calculation, essentially slicing the fractional portion to obtain the correct result. The equation is performed when a valid data signal is enabled by the previous "Video Input" module. A valid out signal was also introduced to maintain synchronization for the next module in the pipeline. This signal is enabled when valid input data is ready. 
-
-\subsection{Modified Video Pipeline}
-Talk about moving the RGB conversion further upstream prior to the SDRAM such that we can work in RGB.
+\subsection{Storing the Base Frame}
+As demonstrated in \cite{phase1}, the object tracking algorithm is entirely dependent on generating the delta frame, which is the grayscale difference between the the current frame and the base frame (i.e. the scene background). A method for acquiring the current frame was demonstrated in section \ref{sec:pipe}, using the SDRAM FIFO frame buffer. To acquire the base frame in a method conducive to the algorithm, the following requirements needed to be met:
+\begin{itemize}
+\item The base frame must be stored (i.e. latched) at a time determined by the user. It must be able to be latched multiple times.
+\item The base frame must persist in memory while the system is powered on.
+\item The base frame storage must have capacity for $640*480$ pixels with 2 bytes of data per pixel. This is 614,400 bytes of memory.
+\end{itemize}
+Since the SDRAM is already in use, another form of memory needed to be employed. Available resources on the DE2 board are SRAM and flash memory, as well as distributed RAM on the FPGA itself. Attempting to route that much RAM on the FPGA seemed like it could cause timing issues, and since the SRAM interface appeared to simpler than flash, a design decision was made to use the SRAM to store the base frame. The SRAM has 1 megabyte of storage with a 16-bit data bus \cite{sram}, which is a benefit since it matches the data width of the SDRAM. \\\\
+The SRAM has a large bus of signals that must be driven by the FPGA. In order to simplify this process, a SRAM controller module was written to wrap the SRAM bus as a simple RAM interface. The simplest implementation of a block RAM needs only a few signals:
+\begin{itemize}
+\item Write Enable - Input: \texttt{wen}
+\item Address - Input: \texttt{addr}
+\item Input Data - Input: \texttt{din}
+\item Output Data - Output: \texttt{dout}
+\end{itemize}
+Sometimes an overall enable signal is used, but this was not necessary. These signals, as well as a clock and reset, define the input/output signals for the SRAM controller that was implemented in the module \texttt{sram\_wrapper.v}. This module is quite simple, and simply drives the signals according to the datasheet specifications in \cite{sram}. The only challenge in developing this module was figuring out how to using the bidirectional data port, \texttt{SRAM\_DQ}, which required using two internal registers and three flip-flops.
+\subsection{Modified Video Pipeline \#2}
 \subsubsection{Delta Frame Generation}
-Discuss the poor man's absolute value implemented and the saturation filter.
+\hl{TODO:} Discuss the absolute value and the saturation filter.
 \subsubsection{Moving Average Filter}
-Show the two pictures of the before/after moving average filter here.
+\hl{TODO:} Show the two pictures of before and after the moving average filter.
 \subsection{Measuring Object Position}
 The delta frame data is used to identify the $(x,y)$ coordinates of the object. For this step in the pipeline, one module was designed to calculate the $(x,y)$ coordinate, marking the centre of the object in the frame. Another module was developed to colour the location of the object in the frame for visual identification on the monitor. \\\\
 To measure the position of the object, several input data sources were utilized. The input delta frame data is binary. All ones in the delta frame register represent and object pixel, while all zeroes represents the background. When an object pixel is received, the register that holds the total number of object pixels is incremented and the $x$ and $y$ coordinate sum registers are also respectively incremented by the current $x$ and $y$ locations of the object pixel in the frame. The $x$ and $y$ locations are received from the VGA module position outputs. These position sources were used instead of internal counters to ensure that processing is synchronized with the output. Using this process, all the necessary data for equations (2) and (3) are satisfied and the calculation can be preformed under a valid signal condition to obtain the centre of the object. The result is calculated and ready for output when the last pixel in the frame is received and processed. At the beginning of each new frame all data is reset for a fresh calculation. The end of the frame is identified when the $x$ and $y$ location values have reached their max resolution values of 640 and 480 respectively. If no object is in the frame, we don't want to identify noise as an object. To prevent this from happening, a simple threshold was implemented. If the total count of object pixels is less than 40 then the $x$ and $y$ location will be set to a value that is not to be displayed on the monitor. \\\\
 The second module utilizes the raw $(x,y)$ coordinates and the updated Kalman $(x,y)$ coordinates to display visual identification of the object on the monitor. The pixels around the raw coordinates are coloured as a red box while the pixels around the Kalman coordinates are coloured as a green box. The incoming $(x,y)$ VGA position coordinate is monitored. If a $(x,y)$ position is within 20 pixels of the object's position, then that pixel is coloured red. The same process is repeated comparing VGA position to Kalman $(x,y)$ coordinates, but instead colouring the pixels green. The result on the monitor shows a red box tracking the object and a green box following the object moving accordingly to Kalman filter specifications. 
-
 \subsection{Kalman Filter}
-Lots of meat here.
+\hl{TODO:} Explain the fixed-point architecture, finite-state machine, and restate the Kalman equations.
 \section{Testing \& Verification}
-\hl{TODO:} This section.
+\hl{TODO:} Talk about how some modules were verified with simulation (show example waveform) and talk about how some were verified qualitatively.
 \section{Impact on Society}
-Since the scope and application of the project did not change between Phases 1 and 2, discussion of the project's impact on society is entirely based off of the Phase 1 report \cite{15}. \\\\
+Since the scope and application of the project did not change between Phases 1 and 2, discussion of the project's impact on society is entirely based off of the Phase 1 report \cite{phase1}. \\\\
 Our dedicated hardware object tracking system will have some impacts in society, but no profound negative impacts. The most notable impact will be its automating effect in the applications it is integrated with. Its introduction to another system will fulfill a task that could have been previously accomplished by a human or even by software previously embedded within the system. The consumer would have to purchase our hardware to implement our system. Our choice of hardware, the Altera DE2 Board has an upfront cost of around \textdollar500. This can be a substantial price for the consumer but the performance benefits outweigh that of embedded software, and in the case of surveillance for example, the cost of running our system will be less than paying a worker to watch a video feed for objects. The introduction of new technology that makes a manned job obsolete is often viewed as a negative impact on society, but this sort of progress is inevitable. \\\\
 In the design process so far, we have not made any sort of environmental impact as we have just been developing software. Our system is going to be a combination of previously manufactured parts which were presumably made with the environment in mind. There are so many electronics already in use in society today, the addition of our system's environmental impact can not be quantified. Our product does not produce waste nor does it need constant physical additions. It requires a small constant supply of electricity. When it is no longer needed it can be properly recycled in the same way that computers and other electronics are. Our system does not pose any health or safety risks.\\\\
 As mentioned earlier, the value of our device comes from the additional performance gained by a secondary system using it. It is possible that the secondary system has some sort of malicious intent but our product cannot be responsible for any negative consequences the secondary system produces. 
 \section{Allocation of Work}
-The majority of the hardware implementation this semester was done by Ben with Taylor providing some assistance. Ben was more skilled with hardware description languages and was able to setup the monitor-FPGA interface early on. This required a lot of work and was necessary before we could begin with algorithm implementation. Once the setup was done, the modules were divided between us and were worked on and tested separately. Some modules required both of us to collaborate. Taylor developed the RGB to grayscale module and the measure position module. Ben developed the SDRAM controller, delta frame generation and filtering module, colour position module, and VGA sync module as well as incorporating the sample Terasic modules. The Kalman filter module was worked on by both of us but with Ben spending more individual time on the finite state machine for it. The fixed point library implementation and logic was handled by Ben for the whole pipeline. Both of us participated in several work sessions were we would brainstorm ideas, debug, and test the system. Collaboration and version control was done through a Github repository. For documentation, the progress reports were split evenly. The poster was designed by Taylor with Ben contributing content. For the final report Taylor was assigned a few sections with the majority being written by Ben. No significant teamwork issues were encountered as we were able to meet all deadlines and accomplish our goals.  
-
+The majority of the hardware implementation this semester was done by Ben with Taylor providing some assistance. Ben was more skilled with hardware description languages and was able to setup the monitor-FPGA interface early on. This required a lot of work and was necessary before we could begin with algorithm implementation. Once the setup was done, the modules were divided between us and were worked on and tested separately. Some modules required both of us to collaborate. Taylor developed the RGB to grayscale module and the measure position module. Ben developed the SDRAM controller, delta frame generation and filtering module, colour position module, and VGA sync module as well as incorporating the sample Terasic modules. The Kalman filter module was worked on by both of us but with Ben spending more individual time on the finite state machine for it. The fixed point library implementation and logic was handled by Ben for the whole pipeline. Both of us participated in several work sessions were we would brainstorm ideas, debug, and test the system. Collaboration and version control was done through a Github repository. For documentation, the progress reports were split evenly. The poster was designed by Taylor with Ben contributing content. For the final report Taylor was assigned a few sections with the majority being written by Ben. No significant teamwork issues were encountered as we were able to meet all deadlines and accomplish our goals.
 \section{Conclusion}
 The final hardware implementation was a success, and the system can display a red dot that shows the $(x,y)$ measurement of the object in the frame as well as green dot showing the improved $(x',y')$ position the Kalman filter produces. Due to the underlying principles of the delta frame generation, the system is an object tracking algorithm and not a motion tracking algorithm. However, the Kalman filter theoretical model assumes constant velocity.This is why when the object stops moving, the green dot slowly converges to the red one. This shows the system favoring the measurements over the model to reduce error, and demonstrates the Kalman filter functioning properly. When the object is moving with constant velocity, the Kalman filter provides a smoother, improved output.
 \subsection{Future Work}
@@ -233,10 +279,10 @@ M. Shabany. (2011, December 27). \textit{Floating-point to Fixed-point Conversio
 N. Devillard. (1998, July). \textit{Fast median search: an ANSI C implementation} [Online]. Available: http://ndevilla.free.fr/median/median.pdf
 \bibitem{12}
 D. Kohanbash. (2014, January 30). \textit{Kalman Filtering - A Practical Implementation Guide (with code!)} [Online]. Available: http://robotsforroboticists.com/kalman-filtering/
-\bibitem{13} Recommendation ITU-R BT.656-5 (12/2007). “Interface for digital component video signals in 525-line and 625-line television systems operating at the 4:2:2 level of Recommendation ITU-R BT.601". 
-\bibitem{14} ISSI Datasheet: “1M x 16 High-Speed Asynchronous CMOS Static RAM with 3.3V Supply".
-\bibitem{15} B. Brown \& T. Dotsikas, “A Real-Time Object Tracking System”, ECSE 456 Final Report, unpublished.
-\bibitem{16} \textit{VESA and Industry Standards and Guidelines for Computer Display Monitor Timing (DMT)}, Video Electronics Standards Association, Version 1, Revision 11.
+\bibitem{itu} Recommendation ITU-R BT.656-5 (12/2007). “Interface for digital component video signals in 525-line and 625-line television systems operating at the 4:2:2 level of Recommendation ITU-R BT.601". 
+\bibitem{sram} ISSI Datasheet: “1M x 16 High-Speed Asynchronous CMOS Static RAM with 3.3V Supply".
+\bibitem{vga} \textit{VESA and Industry Standards and Guidelines for Computer Display Monitor Timing (DMT)}, Video Electronics Standards Association, Version 1, Revision 11.
+\bibitem{phase1} B. Brown \& T. Dotsikas, “A Real-Time Object Tracking System”, ECSE 456 Final Report, unpublished.
 \end{thebibliography}
 \newpage
 \appendix
