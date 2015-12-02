@@ -12,6 +12,8 @@
 \usepackage{soul} % Highlighted text
 \usepackage{fancyhdr}
 \usepackage{appendix}
+\usepackage{hyperref}
+\usepackage{url}
 \usepackage{mcode}
 \graphicspath{{images/}} % Allows picture import
 \pagestyle{fancy}
@@ -80,13 +82,13 @@ We would like to thank Professor Warren Gross and Arash Ardakani for overseeing 
 \item[] SDRAM - Synchronous Dynamic Random Access Memory
 \item[] SRAM - Static Random Access Memory
 \item[] RAM - Random Access Memory
+\item[] FSM - Finite-State Machine
 \end{itemize}
 \section{Introduction}
 The ability to determine the position of an object in a scene is a highly relevant challenge for industries like surveillance and robotics. This task represents a challenge from an engineering perspective due to the real-time timing constraints placed on these systems, and the large amount of data that must be processed when working with video data. In order to overcome these challenges, custom hardware implementation has become an increasingly popular solution as demonstrated in \cite{1}, \cite{2}, and \cite{3}. \\\\
 \hl{TODO:} This section needs more work.
 \section{Background}
-This section contains the prerequisite information regarding video tracking needed to understand the system architecture and design. For background information regarding the basics of video processing, Kalman filtering, fixed-point representation, and optical flow, please see \cite{phase1}. \\\\
-\hl{TODO:} Is just referencing this background information enough? Or do we need to repeat the Kalman equations, delta frame generation, and other topics again?
+This section contains the prerequisite information regarding video tracking needed to understand the system architecture and design. For background information regarding the basics of video processing, Kalman filtering, fixed-point representation, and optical flow, please see \cite{phase1}.
 \subsection{Moving Average Filter}
 \label{sec:filter}
 A moving average filter replaces the current input data sample with a mean of some number of past input data samples. The number is referred to as the moving average filter length, $N$. This type of filter is particularly useful when data samples are arriving in a time series (i.e. at constant time intervals) as it will remove outliers, creating a smoother trend in data samples. Given that $p_i$ is the current input data sample, the filtered results, $p_i'$, is given using the following equation,
@@ -316,8 +318,71 @@ The delta frame data is used to identify the $(x,y)$ coordinates of the object. 
 To measure the position of the object, several input data sources were utilized. The input delta frame data is binary. All ones in the delta frame register represent and object pixel, while all zeroes represents the background. When an object pixel is received, the register that holds the total number of object pixels is incremented and the $x$ and $y$ coordinate sum registers are also respectively incremented by the current $x$ and $y$ locations of the object pixel in the frame. The $x$ and $y$ locations are received from the VGA module position outputs. These position sources were used instead of internal counters to ensure that processing is synchronized with the output. Using this process, all the necessary data for equations (2) and (3) are satisfied and the calculation can be preformed under a valid signal condition to obtain the centre of the object. The result is calculated and ready for output when the last pixel in the frame is received and processed. At the beginning of each new frame all data is reset for a fresh calculation. The end of the frame is identified when the $x$ and $y$ location values have reached their max resolution values of 640 and 480 respectively. If no object is in the frame, we don't want to identify noise as an object. To prevent this from happening, a simple threshold was implemented. If the total count of object pixels is less than 40 then the $x$ and $y$ location will be set to a value that is not to be displayed on the monitor. \\\\
 The second module utilizes the raw $(x,y)$ coordinates and the updated Kalman $(x,y)$ coordinates to display visual identification of the object on the monitor. The pixels around the raw coordinates are coloured as a red box while the pixels around the Kalman coordinates are coloured as a green box. The incoming $(x,y)$ VGA position coordinate is monitored. If a $(x,y)$ position is within 20 pixels of the object's position, then that pixel is coloured red. The same process is repeated comparing VGA position to Kalman $(x,y)$ coordinates, but instead colouring the pixels green. The result on the monitor shows a red box tracking the object and a green box following the object moving accordingly to Kalman filter specifications. 
 \subsection{Kalman Filter}
-\hl{TODO:} Explain the fixed-point architecture, finite-state machine, and restate the Kalman equations.
+The final module developed for the system was the Kalman filter, in the file \texttt{kalman.v}. An in-depth discussion about Kalman filters for object tracking can be found in the Phase 1 report \cite{phase1}, however a brief summary will be provided here. The Kalman filter takes the $(x,y)$ position of the object as input, and computes an improved $(x',y')$ position by using a theoretical model of the system and a characterization of the system error. This is accomplished by iterating through the following set of equations for each input sample. \\\\	
+\textbf{Prediction Equations:}
+\begin{equation}
+\vec{x_{k+1}} = F \cdot \vec{x_k} + B \cdot \vec{u_k}
+\label{eq:firstkalman}
+\end{equation}
+\begin{equation}
+P_{k+1} = F \cdot P_k \cdot F^T + Q
+\end{equation}
+\textbf{Intermediate Calculations:}
+\begin{equation}
+\vec{y_{k+1}} = \vec{z_k} - H \cdot \vec{x_{k+1}}
+\end{equation}
+\begin{equation}
+S_{k+1} = H \cdot P_{k+1} \cdot H^T + R
+\end{equation}
+\begin{equation}
+K_{k+1} = P_{k+1} \cdot H^T \cdot S_{k+1}^{-1}
+\end{equation}
+\textbf{Update Equations:}
+\begin{equation}
+\hat{\vec{x_{k+1}}} = \vec{x_{k+1}} + K_{k+1} \cdot \vec{y_{k+1}}
+\end{equation}
+\begin{equation}
+\hat{P_{k+1}} = (I - K_{k+1} \cdot H) \cdot P_{k+1}
+\end{equation}
+The model chosen during Phase 1 of the project is constant velocity (i.e. the assumption is made that the object with travel with constant velocity). This means that the state vector, $\vec{x}$, has 4 states: position and velocity in both x and y directions. This means that matrices like $P$ and $F$ are $4 \times 4$, and the matrix math requires many computations. This represents one of the main challenges for hardware implementation of the Kalman filter equations, the shear number of calculations that must take place. This is addressed by "unraveling" the matrix operations using the Verilog \texttt{generate} keyword and lots of loops. The next challenge for hardware implementation of the Kalman filter is that the equations just listed must be completed in a specific, sequential order. To achieve sequential operation using an HDL, a finite-state machine (FSM) must be used. Figure \ref{fig:kalmanFSM} demonstrates the operation of the FSM implemented in \texttt{kalman.v}.
+\FloatBarrier
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{./images/kalman_fsm.jpg}
+\caption{Kalman Filter Finite-State Machine}
+\label{fig:kalmanFSM}
+\end{figure}
+\FloatBarrier
+The final, and perhaps most difficult, challenge in designing this module is using fixed-point math. Floating point math requires lots of FPGA resources due to large word length of operands and complex hardware for operations. Fixed-point architecture is characterized by the number of bits used to represent the integer portion, and the number of bits used to represent the fractional portion. Typically this is stylized as $(W, F)$, where the binary string contains $W$ bits, $W-F$ integer bits, and $F$ fractional bits. The need for fixed-point math is introduced in two key places of the Kalman filter equations. The first is the theoretical model matrix, $F$. In this matrix, a value must be used to represent the time step between measurements. Since one measurement occurs per frame and the frame rate is 60 Hz, this time step is 16.6 ms. Since the value is less than one, a fractional portion is needed. Similarly, the Kalman filter equations require computing a matrix inverse, $S^{-1}$. Since $S$ is a $2 \times 2$ matrix, the inverse can be calculated with the formula,
+\begin{equation}
+S^{-1} = \frac{1}{ad - bc}
+\begin{bmatrix}
+d & -b \\
+-c & a \\
+\end{bmatrix}.
+\label{eq:inv}
+\end{equation}
+Again, a value that is less than one will occur, and a fractional portion is needed. Fortunately, the challenge of fixed-point arithmetic was addressed by using a fixed-point Verilog library developed by Tom Burke and Sam Skalicky on \href{http://opencores.org/websvn,filedetails?repname=verilog_fixed_point_math_library&path=%2Fverilog_fixed_point_math_library%2Ftrunk%2FReadMe.txt}{OpenCores}. Specifically, the library modules for fixed-point addition, multiplication, and division were implemented in the Kalman filter for all of the equations. The library assumes data is represented in the $(W,F)$ architecture with the top most bit be used for sign. Both input operands must have the same architecture, and the result is returned with the same architecture. The addition (which also can perform subtraction by flipping a sign bit) and multiplication modules are strictly combinational and adds no overhead. However the division module does require $W+F+1$ clock cycles to compute the result, and has control signals to start and finish the operation. \\\\
+The Kalman filter module was validated using functional simulation. A testbench was written to put a repeating $(x,y)$ coordinate into the module and the result was observed. The software implementation of the Kalman filter equations, developed in Phase 1, was also tested with the same number of iterations and the same $(x,y)$ pair. The system was validated by comparing the hardware simulation against the software results. The specifics of the simulation will be discussed in section \ref{sec:sim}. \\\\ 
+The first working attempt had a fixed-point architecture of $(37, 15)$. This is due to the fact that the maximum value occurring in this first attempt was on the order of 4 million. This value is introduced when computing the determinant of the $S$ matrix. The $S$ matrix has the following form:
+\begin{equation}
+S = 
+\begin{bmatrix}
+X & 0 \\
+0 & X \\
+\end{bmatrix}
+\end{equation}
+Where $X$ is on the order of 2000. So when computing the determinant in equation \ref{eq:inv}, this maximum value is reached. In order to properly represent this number, 21-bits of integer portion are needed. On the first attempt the fractional portion was arbitrarily set and not optimized. This architecture was clearly too large, and needed to be optimized. Optimization could be performed due to the consistent form of the $S$ matrix just described. Computing the inverse of $S$ always gave a matrix with the same form:
+\begin{equation}
+S^{-1} = 
+\begin{bmatrix}
+\frac{1}{X} & 0 \\
+0 & \frac{1}{X}  \\
+\end{bmatrix}
+\end{equation}
+Since this form always holds, it was realized that there is no need to compute the determinant of $S$ (i.e. no need to square $X$). This allowed the max integer portion to be reduced to 11-bits, which is much more logical since it is the number of bits needed to represent any location on the display. The minimum value can also be derived from this $S$ matrix. It was found that the fractional portion could be reduced to 12-bits without any problems. This number of bits also stems from the $S$ matrix, since roughly 11-bits are needed to represent $\frac{1}{2000}$, with some room for fluctuations. Thus, the final fixed-point architecture of the Kalman filter is $(24, 12)$. The completed system design can be seen in appendix \ref{sec:finalPipe}. This figure shows the video pipeline after Kalman filter integration. The orange boxes represent Terasic modules, the red boxes represent off FPGA hardware, and the blue boxes represent modules developed during this project. Integrating the Kalman filter caused no issues after it was validated in simulation.
 \section{Testing \& Verification}
+\label{sec:sim}
 \hl{TODO:} Talk about how some modules were verified with simulation (show example waveform) and talk about how some were verified qualitatively.
 \section{Impact on Society}
 Since the scope and application of the project did not change between Phases 1 and 2, discussion of the project's impact on society is entirely based off of the Phase 1 report \cite{phase1}. \\\\
@@ -327,7 +392,7 @@ As mentioned earlier, the value of our device comes from the additional performa
 \section{Allocation of Work}
 The majority of the hardware implementation this semester was done by Ben with Taylor providing some assistance. Ben was more skilled with hardware description languages and was able to setup the monitor-FPGA interface early on. This required a lot of work and was necessary before we could begin with algorithm implementation. Once the setup was done, the modules were divided between us and were worked on and tested separately. Some modules required both of us to collaborate. Taylor developed the RGB to grayscale module and the measure position module. Ben developed the SDRAM controller, delta frame generation and filtering module, colour position module, and VGA sync module as well as incorporating the sample Terasic modules. The Kalman filter module was worked on by both of us but with Ben spending more individual time on the finite state machine for it. The fixed point library implementation and logic was handled by Ben for the whole pipeline. Both of us participated in several work sessions were we would brainstorm ideas, debug, and test the system. Collaboration and version control was done through a Github repository. For documentation, the progress reports were split evenly. The poster was designed by Taylor with Ben contributing content. For the final report Taylor was assigned a few sections with the majority being written by Ben. No significant teamwork issues were encountered as we were able to meet all deadlines and accomplish our goals.
 \section{Conclusion}
-The final hardware implementation was a success, and the system can display a red dot that shows the $(x,y)$ measurement of the object in the frame as well as green dot showing the improved $(x',y')$ position the Kalman filter produces. Due to the underlying principles of the delta frame generation, the system is an object tracking algorithm and not a motion tracking algorithm. However, the Kalman filter theoretical model assumes constant velocity.This is why when the object stops moving, the green dot slowly converges to the red one. This shows the system favoring the measurements over the model to reduce error, and demonstrates the Kalman filter functioning properly. When the object is moving with constant velocity, the Kalman filter provides a smoother, improved output.
+The final hardware implementation was a success, and the system can display a red dot that shows the $(x,y)$ measurement of the object in the frame as well as green dot showing the improved $(x',y')$ position the Kalman filter produces. Due to the underlying principles of the delta frame generation, the system is an object tracking algorithm and not a motion tracking algorithm. However, the Kalman filter theoretical model assumes constant velocity.This is why when the object stops moving, the green dot slowly converges to the red one. This shows the system favoring the measurements over the model to reduce error, and demonstrates the Kalman filter functioning properly. When the object is moving with constant velocity, the Kalman filter provides a smoother, improved output. Appendix \ref{sec:links} has links to videos demonstrating the final hardware system as well as a link to the project repository, which contains all project source files.
 \subsection{Future Work}
 \subsubsection{Underlying Algorithm}
 The system could be significantly improved by using an object measurement algorithm that has fewer requirements and assumptions regarding the environment. To produce a valid delta frame, the scene background must have constant lighting and no objects in it. In a real-time situation, we found it very difficult to ensure these requirements were met. 
@@ -367,4 +432,19 @@ D. Kohanbash. (2014, January 30). \textit{Kalman Filtering - A Practical Impleme
 \bibitem{vga} \textit{VESA and Industry Standards and Guidelines for Computer Display Monitor Timing (DMT)}, Video Electronics Standards Association, Version 1, Revision 11.
 \bibitem{phase1} B. Brown \& T. Dotsikas, “A Real-Time Object Tracking System”, ECSE 456 Final Report, unpublished.
 \end{thebibliography}
+\newpage
+\appendix
+\appendixpage
+\section{Final Video Pipeline}
+\label{sec:finalPipe}
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{./images/final_pipeline.jpg}
+\end{figure}
+\section{Project Resources}
+\label{sec:links}
+\href{https://github.com/bbrown1867/ObjectTracking}{Project Repository} \\\\
+\href{https://www.youtube.com/watch?v=8xPpoj7ziko}{Video: Hardware Implementation - Pre-Kalman Filter} \\\\
+\href{https://www.youtube.com/watch?v=48JgtHcgVmo}{Video: Hardware Implementation - Post-Kalman Filter} \\\\
+
 \end{document}
