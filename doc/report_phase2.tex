@@ -86,7 +86,7 @@ We would like to thank Professor Warren Gross and Arash Ardakani for overseeing 
 \end{itemize}
 \section{Introduction}
 The ability to determine the position of an object in a scene is a highly relevant challenge for industries like surveillance and robotics. This task represents a challenge from an engineering perspective due to the real-time timing constraints placed on these systems, and the large amount of data that must be processed when working with video data. In order to overcome these challenges, custom hardware implementation has become an increasingly popular solution as demonstrated in \cite{1}, \cite{2}, and \cite{3}. \\\\
-\hl{TODO:} This section needs more work.
+The goal of this project was to research and develop a real-time object tracking system, and implement this system in both software and hardware. The motive was to study computer vision fundamentals like optical flow, and learn about implementing a real-time algorithm using programmable hardware. The final system provides an accurate measurement of an object's position, meaning the system could be used in a variety of applications where this is a concern such as robotics and camera stabilization. Aside to getting the system working, other project goals included low budget, rapid prototyping, low resource utilization, and fast processing to meet real-time constraints.
 \section{Background}
 This section contains the prerequisite information regarding video tracking needed to understand the system architecture and design. For background information regarding the basics of video processing, Kalman filtering, fixed-point representation, and optical flow, please see \cite{phase1}.
 \subsection{Moving Average Filter}
@@ -170,6 +170,7 @@ The system hardware shall be an Altera DE2 breakout board. This breakout board c
 \subsubsection{Method}
 The system hardware shall be implemented using Verilog HDL. The sample designs included with the Altera DE2 breakout board include Verilog modules for video input decoding. In order to utilize these resources and avoid mixing languages, Verilog is the logical choice.
 \section{Design}
+\label{sec:design}
 The hardware implementation design process was organized into experiments. Each experiment focused on investigating, implementing, or integrating a specific function into the overall system. The experiments were chronological, and built on work from the previous experiments. This section has been organized in the same chronological fashion, in order to explain and justify the system design in the manner it was developed.
 \subsection{Generating VGA Output}
 The first experiment was focused on generating an arbitrary VGA output using the Cyclone IV FPGA and the ADV7123. Section \ref{sec:vga} explained the motive and theory behind this. The module \texttt{vga\_sync.v} was written to implement the VGA functionality. The module takes as input the 27 MHz global clock, the global asynchronous reset, and the RGB data. The module drives the following bus of signals as an output:
@@ -383,7 +384,31 @@ S^{-1} =
 Since this form always holds, it was realized that there is no need to compute the determinant of $S$ (i.e. no need to square $X$). This allowed the max integer portion to be reduced to 11-bits, which is much more logical since it is the number of bits needed to represent any location on the display. The minimum value can also be derived from this $S$ matrix. It was found that the fractional portion could be reduced to 12-bits without any problems. This number of bits also stems from the $S$ matrix, since roughly 11-bits are needed to represent $\frac{1}{2000}$, with some room for fluctuations. Thus, the final fixed-point architecture of the Kalman filter is $(24, 12)$. The completed system design can be seen in appendix \ref{sec:finalPipe}. This figure shows the video pipeline after Kalman filter integration. The orange boxes represent Terasic modules, the red boxes represent off FPGA hardware, and the blue boxes represent modules developed during this project. Integrating the Kalman filter caused no issues after it was validated in simulation.
 \section{Testing \& Verification}
 \label{sec:sim}
-\hl{TODO:} Talk about how some modules were verified with simulation (show example waveform) and talk about how some were verified qualitatively.
+As discussed throughout section \ref{sec:design}, the system was validated through a combination of functional simulation and qualitative analysis (i.e. trial and error). Specifically, table \ref{table:testing} shows how each of the experiments discussed in section \ref{sec:design} were validated. While ideally the design flow would always include simulation prior to system integration, in many cases this was not possible since the system requires an analog input signal for stimulation, which we did not have a model for. Thus, any experiment involving the video pipeline had to be validated qualitatively. \\\\
+\begin{table}[h]
+\centering
+\caption{System Validation Summary}
+\label{table:testing}
+ \begin{tabular}{ | p{6cm} | p{4cm} |} \hline
+ \textbf{Experiment} & \textbf{Validation Method}  \\ \hline
+VGA Display & Qualitative \\ \hline
+Basic Video Input/Output & Qualitative \\ \hline
+Modified Pipeline \#1 & Qualitative \\ \hline
+RGB to Grayscale Conversion & Simulation \\ \hline
+SRAM Controller & Simulation \\ \hline
+Modified Pipeline \#2 & Qualitative \\ \hline
+Object Measurement & Qualitative \\ \hline
+Kalman Filter & Simulation \\ \hline
+\end{tabular}
+\end{table}
+The Kalman filter will be used to show an example of the simulation validation process. The first step is to write a testbench which will stimulate the module under test. For this project, testbenches were written in SystemVerilog, as the language allows use of higher-level abstractions like mailboxes. Next, a DO file is written to list the signals that need to be displayed on the waveform window. The Verilog source is compiled, and Modelsim is used to visualize the input, output, and internal signals of interest. The waveforms are then compared to the result of a software test that matches the functionality of the SystemVerilog testbench. For the Kalman filter module, with the state vector initialized to $[10,10,10,10]$, 10 iterations with the same input value of $(370,350)$ produces the following waveform in figure \ref{fig:wave}.
+\begin{figure}[h]
+\centering
+\caption{Kalman Filter Simulation: 10 Iterations of $(370,350)$}
+\includegraphics[width=0.8\textwidth]{./images/kalman_sim.jpg}
+\label{fig:wave}
+\end{figure}
+The corresponding software test and result is shown in appendix \ref{sec:software}. Since this result matches the waveform in figure \ref{fig:wave}, the Kalman filter module is functioning correctly. This is an example of the process taken throughout the project for hardware validation using simulation, and it was successful where applicable.
 \section{Impact on Society}
 Since the scope and application of the project did not change between Phases 1 and 2, discussion of the project's impact on society is entirely based off of the Phase 1 report \cite{phase1}. \\\\
 Our dedicated hardware object tracking system will have some impacts in society, but no profound negative impacts. The most notable impact will be its automating effect in the applications it is integrated with. Its introduction to another system will fulfill a task that could have been previously accomplished by a human or even by software previously embedded within the system. The consumer would have to purchase our hardware to implement our system. Our choice of hardware, the Altera DE2 Board has an upfront cost of around \textdollar500. This can be a substantial price for the consumer but the performance benefits outweigh that of embedded software, and in the case of surveillance for example, the cost of running our system will be less than paying a worker to watch a video feed for objects. The introduction of new technology that makes a manned job obsolete is often viewed as a negative impact on society, but this sort of progress is inevitable. \\\\
@@ -392,7 +417,7 @@ As mentioned earlier, the value of our device comes from the additional performa
 \section{Allocation of Work}
 The majority of the hardware implementation this semester was done by Ben with Taylor providing some assistance. Ben was more skilled with hardware description languages and was able to setup the monitor-FPGA interface early on. This required a lot of work and was necessary before we could begin with algorithm implementation. Once the setup was done, the modules were divided between us and were worked on and tested separately. Some modules required both of us to collaborate. Taylor developed the RGB to grayscale module and the measure position module. Ben developed the SDRAM controller, delta frame generation and filtering module, colour position module, and VGA sync module as well as incorporating the sample Terasic modules. The Kalman filter module was worked on by both of us but with Ben spending more individual time on the finite state machine for it. The fixed point library implementation and logic was handled by Ben for the whole pipeline. Both of us participated in several work sessions were we would brainstorm ideas, debug, and test the system. Collaboration and version control was done through a Github repository. For documentation, the progress reports were split evenly. The poster was designed by Taylor with Ben contributing content. For the final report Taylor was assigned a few sections with the majority being written by Ben. No significant teamwork issues were encountered as we were able to meet all deadlines and accomplish our goals.
 \section{Conclusion}
-The final hardware implementation was a success, and the system can display a red dot that shows the $(x,y)$ measurement of the object in the frame as well as green dot showing the improved $(x',y')$ position the Kalman filter produces. Due to the underlying principles of the delta frame generation, the system is an object tracking algorithm and not a motion tracking algorithm. However, the Kalman filter theoretical model assumes constant velocity.This is why when the object stops moving, the green dot slowly converges to the red one. This shows the system favoring the measurements over the model to reduce error, and demonstrates the Kalman filter functioning properly. When the object is moving with constant velocity, the Kalman filter provides a smoother, improved output. Appendix \ref{sec:links} has links to videos demonstrating the final hardware system as well as a link to the project repository, which contains all project source files.
+The final hardware implementation was a success, and the system can display a red dot that shows the $(x,y)$ measurement of the object in the frame as well as green dot showing the improved $(x',y')$ position the Kalman filter produces. The FPGA resource utilization of the final system is 18\% of available logic, 36\% of available pins, and less than 1\% of the distributed RAM. Due to the underlying principles of the delta frame generation, the system is an object tracking algorithm and not a motion tracking algorithm. However, the Kalman filter theoretical model assumes constant velocity.This is why when the object stops moving, the green dot slowly converges to the red one. This shows the system favoring the measurements over the model to reduce error, and demonstrates the Kalman filter functioning properly. When the object is moving with constant velocity, the Kalman filter provides a smoother, improved output. Appendix \ref{sec:links} has links to videos demonstrating the final hardware system as well as a link to the project repository, which contains all project source files.
 \subsection{Future Work}
 \subsubsection{Underlying Algorithm}
 The system could be significantly improved by using an object measurement algorithm that has fewer requirements and assumptions regarding the environment. To produce a valid delta frame, the scene background must have constant lighting and no objects in it. In a real-time situation, we found it very difficult to ensure these requirements were met. 
@@ -446,5 +471,8 @@ D. Kohanbash. (2014, January 30). \textit{Kalman Filtering - A Practical Impleme
 \href{https://github.com/bbrown1867/ObjectTracking}{Project Repository} \\\\
 \href{https://www.youtube.com/watch?v=8xPpoj7ziko}{Video: Hardware Implementation - Pre-Kalman Filter} \\\\
 \href{https://www.youtube.com/watch?v=48JgtHcgVmo}{Video: Hardware Implementation - Post-Kalman Filter} \\\\
-
+\section{Kalman Filter Software Validation}
+\label{sec:software}
+\subsection{Test Code}
+\subsection{Test Code Trace}
 \end{document}
