@@ -134,6 +134,7 @@ f_{refresh} = \frac{f_{pixel}}{H_{pixels} \times V_{lines}}
 \label{fig:vgaTiming}
 \end{figure}
 As the figure shows, the front porch, back porch, and sync regions form what is known as the blanking period, since no valid video data is displayed during this period. The horizontal sync signal must be pulsed (high or low depending on polarity) prior to the valid data is displayed on each row, for a specific amount of time depending on resolution. Similarly, the vertical sync signal must be pulsed prior to the entire frame is displayed. For the typical $640 \times 480$ VGA resolution, the timing constraints shown in Table \ref{table:vga}. \\\\
+\FloatBarrier
 \begin{table}[h]
 \centering
 \caption{$640 \times 480$ VGA Timing Specifications \cite{vga}}
@@ -150,6 +151,7 @@ Ver. Back Porch & 1.048 ms & 33 \\ \hline
 Ver. Visible & 15.523 ms & 480\\ \hline
 \end{tabular}
 \end{table}
+\FloatBarrier
 \textit{Note: Some specifications, such as \cite{vga}, add two more regions denoted left and right borders. However, since they are functionally irrelevant for this application, they have been lumped into the front and back porches respectively for this discussion.}
 \section{Requirements}
 Due to the fact that the scope of the project did not change between Phases 1 and 2, the requirements listed in this section are largely based off of the Phase 1 report \cite{phase1}. Some additional requirements were added at the beginning of Phase 2 when hardware implementation became clearer.
@@ -190,7 +192,7 @@ The next logical step after getting video output working was to get video input 
 \FloatBarrier
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.6\textwidth]{./images/demoPipeline.jpg}
+\includegraphics[width=0.5\textwidth]{./images/demoPipeline.jpg}
 \caption{Basic Video Input/Output Pipeline}
 \label{fig:basicPipe}
 \end{figure}
@@ -346,14 +348,12 @@ K_{k+1} = P_{k+1} \cdot H^T \cdot S_{k+1}^{-1}
 \hat{P_{k+1}} = (I - K_{k+1} \cdot H) \cdot P_{k+1}
 \end{equation}
 The model chosen during Phase 1 of the project is constant velocity (i.e. the assumption is made that the object with travel with constant velocity). This means that the state vector, $\vec{x}$, has 4 states: position and velocity in both x and y directions. This means that matrices like $P$ and $F$ are $4 \times 4$, and the matrix math requires many computations. This represents one of the main challenges for hardware implementation of the Kalman filter equations, the shear number of calculations that must take place. This is addressed by "unraveling" the matrix operations using the Verilog \texttt{generate} keyword and lots of loops. The next challenge for hardware implementation of the Kalman filter is that the equations just listed must be completed in a specific, sequential order. To achieve sequential operation using an HDL, a finite-state machine (FSM) must be used. Figure \ref{fig:kalmanFSM} demonstrates the operation of the FSM implemented in \texttt{kalman.v}.
-\FloatBarrier
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.8\textwidth]{./images/kalman_fsm.jpg}
 \caption{Kalman Filter Finite-State Machine}
 \label{fig:kalmanFSM}
 \end{figure}
-\FloatBarrier
 The final, and perhaps most difficult, challenge in designing this module is using fixed-point math. Floating point math requires lots of FPGA resources due to large word length of operands and complex hardware for operations. Fixed-point architecture is characterized by the number of bits used to represent the integer portion, and the number of bits used to represent the fractional portion. Typically this is stylized as $(W, F)$, where the binary string contains $W$ bits, $W-F$ integer bits, and $F$ fractional bits. The need for fixed-point math is introduced in two key places of the Kalman filter equations. The first is the theoretical model matrix, $F$. In this matrix, a value must be used to represent the time step between measurements. Since one measurement occurs per frame and the frame rate is 60 Hz, this time step is 16.6 ms. Since the value is less than one, a fractional portion is needed. Similarly, the Kalman filter equations require computing a matrix inverse, $S^{-1}$. Since $S$ is a $2 \times 2$ matrix, the inverse can be calculated with the formula,
 \begin{equation}
 S^{-1} = \frac{1}{ad - bc}
@@ -408,7 +408,7 @@ The Kalman filter will be used to show an example of the simulation validation p
 \includegraphics[width=0.8\textwidth]{./images/kalman_sim.jpg}
 \label{fig:wave}
 \end{figure}
-The corresponding software test and result is shown in appendix \ref{sec:software}. Since this result matches the waveform in figure \ref{fig:wave}, the Kalman filter module is functioning correctly. This is an example of the process taken throughout the project for hardware validation using simulation, and it was successful where applicable.
+The corresponding software test and result is shown in appendix \ref{sec:software}. Since this result roughly matches the waveform in figure \ref{fig:wave}, the Kalman filter module is functioning correctly. The results are not the exact same due to the fact that the MATLAB code in this case is floating point, double precision. Due to flaws in our fixed-point software developed in Phase 1, we were not able to use it as a bit accurate model. This is an example of the process taken throughout the project for hardware validation using simulation, and it was successful where applicable.
 \section{Impact on Society}
 Since the scope and application of the project did not change between Phases 1 and 2, discussion of the project's impact on society is entirely based off of the Phase 1 report \cite{phase1}. \\\\
 Our dedicated hardware object tracking system will have some impacts in society, but no profound negative impacts. The most notable impact will be its automating effect in the applications it is integrated with. Its introduction to another system will fulfill a task that could have been previously accomplished by a human or even by software previously embedded within the system. The consumer would have to purchase our hardware to implement our system. Our choice of hardware, the Altera DE2 Board has an upfront cost of around \textdollar500. This can be a substantial price for the consumer but the performance benefits outweigh that of embedded software, and in the case of surveillance for example, the cost of running our system will be less than paying a worker to watch a video feed for objects. The introduction of new technology that makes a manned job obsolete is often viewed as a negative impact on society, but this sort of progress is inevitable. \\\\
@@ -471,8 +471,40 @@ D. Kohanbash. (2014, January 30). \textit{Kalman Filtering - A Practical Impleme
 \href{https://github.com/bbrown1867/ObjectTracking}{Project Repository} \\\\
 \href{https://www.youtube.com/watch?v=8xPpoj7ziko}{Video: Hardware Implementation - Pre-Kalman Filter} \\\\
 \href{https://www.youtube.com/watch?v=48JgtHcgVmo}{Video: Hardware Implementation - Post-Kalman Filter} \\\\
+\vspace{3 cm}
 \section{Kalman Filter Software Validation}
 \label{sec:software}
 \subsection{Test Code}
+\begin{lstlisting}
+x_old = [10; 10; 10; 10];
+P_old = eye(4);
+t_step = 1 / 64.4;
+
+for i = 1 : 10
+
+    z = [370; 350];
+
+    [x_new, P_new] = applyKalman(z, x_old, P_old, t_step);
+
+    x_old = x_new;
+    P_old = P_new;
+
+    str = sprintf('Iteration #%d: (x,y) = (%d, %d)', i, floor(x_new(1)), floor(x_new(2)));
+    disp(str);
+end
+\end{lstlisting}
 \subsection{Test Code Trace}
+\begin{verbatim}
+>> test
+Iteration #1: (x,y) = (10, 10)
+Iteration #2: (x,y) = (12, 12)
+Iteration #3: (x,y) = (13, 13)
+Iteration #4: (x,y) = (15, 15)
+Iteration #5: (x,y) = (17, 17)
+Iteration #6: (x,y) = (20, 19)
+Iteration #7: (x,y) = (23, 22)
+Iteration #8: (x,y) = (26, 25)
+Iteration #9: (x,y) = (30, 28)
+Iteration #10: (x,y) = (33, 32)
+\end{verbatim}
 \end{document}
