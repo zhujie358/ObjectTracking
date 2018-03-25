@@ -1,9 +1,7 @@
 # ObjectTracking
-McGill University - ECSE 456/457 - Winter/Fall 2015
+Design and implementation of a real-time object tracking system. Please see
+`doc/report_phase1.pdf` and `doc/report_phase2.pdf` for project details.
 
-Development of a real-time object tracking system to be implemented on an FPGA. 
-
-Phase I: Software Development - `sw/` 
-
-Phase II: Hardware Development - `hw/`
-
+* `doc` - Project documentation.
+* `sw` - Algorithm prototyping in MATLAB.
+* `hw` - Hardware implementation of the algorithm in a real-time video pipeline.
